@@ -23,6 +23,9 @@
 
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QColor>
+#include <QByteArray>
+#include <QPainterPath>
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
@@ -68,6 +71,10 @@ class AbstractNotationPaintView : public muse::uicomponents::QuickPaintedView, p
     Q_PROPERTY(bool isMainView READ isMainView WRITE setIsMainView NOTIFY isMainViewChanged)
 
     Q_PROPERTY(bool readOnly READ readonly WRITE setReadonly NOTIFY readonlyChanged)
+    Q_PROPERTY(bool drawingMode READ drawingMode WRITE setDrawingMode NOTIFY drawingModeChanged)
+    Q_PROPERTY(QString drawingTool READ drawingTool WRITE setDrawingTool NOTIFY drawingToolChanged)
+    Q_PROPERTY(QColor drawingColor READ drawingColor WRITE setDrawingColor NOTIFY drawingStyleChanged)
+    Q_PROPERTY(qreal drawingWidth READ drawingWidth WRITE setDrawingWidth NOTIFY drawingStyleChanged)
 
     muse::GlobalInject<INotationConfiguration> notationConfiguration;
     muse::GlobalInject<INotationSceneConfiguration> configuration;
@@ -161,6 +168,15 @@ public:
     bool readonly() const;
     void setReadonly(bool readonly);
 
+    bool drawingMode() const { return m_drawingMode; }
+    void setDrawingMode(bool enabled);
+    QString drawingTool() const { return m_drawingTool; }
+    void setDrawingTool(const QString& tool);
+    QColor drawingColor() const { return m_drawingColor; }
+    void setDrawingColor(const QColor& color);
+    qreal drawingWidth() const { return m_drawingWidth; }
+    void setDrawingWidth(qreal width);
+
 signals:
     void showContextMenuRequested(int elementType, const QPointF& viewPos);
     void hideContextMenuRequested();
@@ -185,6 +201,9 @@ signals:
     void isMainViewChanged(bool isMainView);
 
     void readonlyChanged();
+    void drawingModeChanged();
+    void drawingToolChanged();
+    void drawingStyleChanged();
 
 protected:
     INotationPtr notation() const;
@@ -279,6 +298,12 @@ private:
     muse::PointF alignToCurrentPageBorder(const muse::RectF& showRect, const muse::PointF& pos) const;
 
     void paintBackground(const muse::RectF& rect, muse::draw::Painter* painter);
+    bool handleDrawingMousePress(QMouseEvent* event);
+    bool handleDrawingMouseMove(QMouseEvent* event);
+    bool handleDrawingMouseRelease(QMouseEvent* event);
+    void updateDrawingPath(const QPointF& position);
+    void commitDrawing();
+    QByteArray drawingSvg() const;
 
     muse::PointF canvasCenter() const;
     std::pair<qreal, qreal> constraintCanvas(qreal dx, qreal dy) const;
@@ -332,5 +357,13 @@ private:
     qint64 m_lastPlaybackPositionUpdateTimeNs = 0;
     QTimer m_updatePlaybackCursorInterpolatedTimer;
     QElapsedTimer m_elapsedTimer;
+    bool m_drawingMode = false;
+    bool m_isDrawing = false;
+    bool m_drawingSelectionGesture = false;
+    QString m_drawingTool = QStringLiteral("select");
+    QColor m_drawingColor = QColor(QStringLiteral("#1f1f1f"));
+    qreal m_drawingWidth = 1.5;
+    QPointF m_drawingStart;
+    QPainterPath m_drawingPath;
 };
 }

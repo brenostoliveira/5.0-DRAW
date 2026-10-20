@@ -78,6 +78,7 @@
 #include "engraving/dom/lyrics.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
+#include "engraving/dom/measurebase.h"
 #include "engraving/dom/mscore.h"
 #include "engraving/dom/page.h"
 #include "engraving/dom/part.h"
@@ -6295,6 +6296,33 @@ void NotationInteraction::addImageToItem(const muse::io::path_t& imagePath, Engr
     startEdit(TranslatableString("undoableAction", "Add image"));
     score()->undoAddElement(image);
     apply();
+}
+
+bool NotationInteraction::addVectorDrawing(const QByteArray& svg, const PointF& position, const SizeF& size)
+{
+    if (svg.isEmpty() || size.width() <= 0.0 || size.height() <= 0.0) {
+        return false;
+    }
+
+    MeasureBase* measureBase = score()->pos2measureBase(position, false, nullptr, nullptr, nullptr, nullptr);
+    if (!measureBase) {
+        return false;
+    }
+
+    Image* image = Factory::createImage(measureBase);
+    if (!image->loadFromData("drawing.svg", muse::ByteArray::fromQByteArray(svg))) {
+        delete image;
+        return false;
+    }
+
+    image->setSizeIsSpatium(false);
+    image->setSize(size);
+    image->setOffset(position - measureBase->canvasPos());
+
+    startEdit(TranslatableString("undoableAction", "Add drawing"));
+    score()->undoAddElement(image);
+    apply();
+    return true;
 }
 
 void NotationInteraction::addFiguredBass()

@@ -2953,6 +2953,13 @@ static const std::vector<CommandInfo> s_commandInfos = {
         Decoration(IconCode::Code::AUTOMATION, rcommand::Checkable::Yes)
     },
     CommandInfo {
+        TOGGLE_DRAWING_MODE_COMMAND,
+        TranslatableString("action", "Draw"),
+        TranslatableString("action", "Toggle drawing mode"),
+        InputSchema(),
+        Decoration(IconCode::Code::EDIT, rcommand::Checkable::Yes)
+    },
+    CommandInfo {
         SELECT_AUTOMATION_TYPE_COMMAND,
         TranslatableString::untranslatable("Automation type"),
         TranslatableString::untranslatable("Select automation type"),

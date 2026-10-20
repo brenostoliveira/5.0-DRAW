@@ -111,6 +111,46 @@ Notification NotationSceneConfiguration::isSmoothPanningChanged() const
     return m_isSmoothPanningChanged;
 }
 
+bool NotationSceneConfiguration::drawingModeEnabled() const
+{
+    return m_drawingModeEnabled;
+}
+
+void NotationSceneConfiguration::setDrawingModeEnabled(bool enabled)
+{
+    if (m_drawingModeEnabled == enabled) {
+        return;
+    }
+
+    m_drawingModeEnabled = enabled;
+    m_drawingModeEnabledChanged.notify();
+}
+
+Notification NotationSceneConfiguration::drawingModeEnabledChanged() const
+{
+    return m_drawingModeEnabledChanged;
+}
+
+QString NotationSceneConfiguration::drawingTool() const
+{
+    return m_drawingTool;
+}
+
+void NotationSceneConfiguration::setDrawingTool(const QString& tool)
+{
+    if (m_drawingTool == tool) {
+        return;
+    }
+
+    m_drawingTool = tool;
+    m_drawingToolChanged.notify();
+}
+
+Notification NotationSceneConfiguration::drawingToolChanged() const
+{
+    return m_drawingToolChanged;
+}
+
 bool NotationSceneConfiguration::isLimitCanvasScrollArea() const
 {
     return settings()->value(IS_LIMIT_CANVAS_SCROLL_AREA_KEY).toBool();

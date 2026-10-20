@@ -25,10 +25,13 @@
 #include <QCursor>
 #include <QPainter>
 #include <QMimeData>
+#include <QPen>
+#include <QStringList>
 
 #include "async/async.h"
 
 #include "engraving/dom/shadownote.h"
+#include "engraving/dom/engravingitem.h"
 
 #include "notation/imasternotation.h" // IWYU pragma: keep
 #include "notation/inotationaccessibility.h" // IWYU pragma: keep
@@ -147,6 +150,27 @@ void AbstractNotationPaintView::load()
     configuration()->isSmoothPanningChanged().onNotify(this, [this]() {
         m_isSmoothPanningEnabled = configuration()->isSmoothPanning();
     }, async::Asyncable::Mode::SetReplace);
+
+    configuration()->drawingModeEnabledChanged().onNotify(this, [this]() {
+        if (!isMainView()) {
+            return;
+        }
+
+        if (configuration()->drawingModeEnabled() && (readonly() || publishMode())) {
+            configuration()->setDrawingModeEnabled(false);
+            return;
+        }
+
+        setDrawingMode(configuration()->drawingModeEnabled());
+    });
+    configuration()->drawingToolChanged().onNotify(this, [this]() {
+        if (isMainView()) {
+            setDrawingTool(configuration()->drawingTool());
+        }
+    });
+    if (isMainView()) {
+        setDrawingTool(configuration()->drawingTool());
+    }
 
     globalContext()->playbackState()->playbackPositionChanged().onReceive(this, [this](secs_t secs) {
         m_lastPlaybackPosition = secs;
@@ -773,6 +797,14 @@ void AbstractNotationPaintView::paint(QPainter* qp)
         opt.invertColors = notationConfiguration()->shouldInvertScore();
         m_continuousPanel->paint(*painter, nvCtx, opt);
     }
+
+    if (m_drawingMode && m_isDrawing && !m_drawingPath.isEmpty()) {
+        qp->save();
+        qp->setPen(QPen(m_drawingColor, m_drawingWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        qp->setBrush(m_drawingTool == QLatin1String("filledArrow") ? QBrush(m_drawingColor) : QBrush(Qt::NoBrush));
+        qp->drawPath(m_drawingPath);
+        qp->restore();
+    }
 }
 
 void AbstractNotationPaintView::onNotationSetup()
@@ -1316,16 +1348,36 @@ void AbstractNotationPaintView::mousePressEvent(QMouseEvent* event)
     TRACEFUNC;
     forceFocusIn();
 
+    if (handleDrawingMousePress(event)) {
+        return;
+    }
+
     if (isInited()) {
-        m_inputController->mousePressEvent(event);
+        if (m_drawingMode) {
+            QMouseEvent drawingEvent(event->type(), event->position(), event->scenePosition(), event->globalPosition(),
+                                     event->button(), event->buttons(), Qt::NoModifier, event->pointingDevice());
+            m_inputController->mousePressEvent(&drawingEvent);
+        } else {
+            m_inputController->mousePressEvent(event);
+        }
     }
 }
 
 void AbstractNotationPaintView::mouseMoveEvent(QMouseEvent* event)
 {
     TRACEFUNC;
+    if (handleDrawingMouseMove(event)) {
+        return;
+    }
+
     if (isInited()) {
-        m_inputController->mouseMoveEvent(event);
+        if (m_drawingMode) {
+            QMouseEvent drawingEvent(event->type(), event->position(), event->scenePosition(), event->globalPosition(),
+                                     event->button(), event->buttons(), Qt::NoModifier, event->pointingDevice());
+            m_inputController->mouseMoveEvent(&drawingEvent);
+        } else {
+            m_inputController->mouseMoveEvent(event);
+        }
     }
 }
 
@@ -1334,6 +1386,11 @@ void AbstractNotationPaintView::mouseDoubleClickEvent(QMouseEvent* event)
     TRACEFUNC;
     forceFocusIn();
 
+    if (m_drawingMode) {
+        event->accept();
+        return;
+    }
+
     if (isInited()) {
         m_inputController->mouseDoubleClickEvent(event);
     }
@@ -1341,14 +1398,24 @@ void AbstractNotationPaintView::mouseDoubleClickEvent(QMouseEvent* event)
 
 void AbstractNotationPaintView::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (handleDrawingMouseRelease(event)) {
+        return;
+    }
+
     if (isInited()) {
-        m_inputController->mouseReleaseEvent(event);
+        if (m_drawingMode) {
+            QMouseEvent drawingEvent(event->type(), event->position(), event->scenePosition(), event->globalPosition(),
+                                     event->button(), event->buttons(), Qt::NoModifier, event->pointingDevice());
+            m_inputController->mouseReleaseEvent(&drawingEvent);
+        } else {
+            m_inputController->mouseReleaseEvent(event);
+        }
     }
 }
 
 void AbstractNotationPaintView::hoverMoveEvent(QHoverEvent* event)
 {
-    if (isInited()) {
+    if (isInited() && !m_drawingMode) {
         m_inputController->hoverMoveEvent(event);
     }
 }
@@ -1403,6 +1470,11 @@ bool AbstractNotationPaintView::event(QEvent* event)
                                || eventType == QEvent::Type::ContextMenu) && hasFocus();
 
     if (isContextMenuEvent) {
+        if (m_drawingMode) {
+            event->accept();
+            return true;
+        }
+
         QContextMenuEvent* contextMenuEvent = dynamic_cast<QContextMenuEvent*>(event);
         if (contextMenuEvent && contextMenuEvent->reason() == QContextMenuEvent::Mouse
             && m_inputController->ignoreNextMouseContextMenuEvent()) {
@@ -1498,11 +1570,306 @@ void AbstractNotationPaintView::setReadonly(bool readonly)
     }
 
     m_readonly = readonly;
+    if (m_readonly) {
+        setDrawingMode(false);
+    }
     if (m_inputController) {
         m_inputController->setReadonly(m_readonly);
     }
 
     emit readonlyChanged();
+}
+
+void AbstractNotationPaintView::setDrawingMode(bool enabled)
+{
+    if (m_drawingMode == enabled || (enabled && (readonly() || publishMode()))) {
+        return;
+    }
+
+    m_drawingMode = enabled;
+    m_isDrawing = false;
+    m_drawingSelectionGesture = false;
+    m_drawingPath = QPainterPath();
+    if (enabled && notationInteraction()) {
+        notationInteraction()->noteInput()->endNoteInput();
+        notationInteraction()->endEditElement();
+        notationInteraction()->clearSelection();
+        hideContextMenu();
+        hideElementPopup();
+    }
+    emit drawingModeChanged();
+    if (isMainView()) {
+        configuration()->setDrawingModeEnabled(enabled);
+    }
+    scheduleRedraw();
+}
+
+void AbstractNotationPaintView::setDrawingTool(const QString& tool)
+{
+    static const QStringList supportedTools { QStringLiteral("select"), QStringLiteral("pencil"), QStringLiteral("line"),
+                                              QStringLiteral("rectangle"), QStringLiteral("ellipse"), QStringLiteral("triangle"),
+                                              QStringLiteral("rightTriangle"), QStringLiteral("diamond"),
+                                              QStringLiteral("roundedRectangle"),
+                                              QStringLiteral("star"), QStringLiteral("cross"), QStringLiteral("arrow"),
+                                              QStringLiteral("doubleArrow"),
+                                              QStringLiteral("filledArrow") };
+    if (!supportedTools.contains(tool) || m_drawingTool == tool) {
+        return;
+    }
+
+    m_drawingTool = tool;
+    if (isMainView()) {
+        configuration()->setDrawingTool(tool);
+    }
+    emit drawingToolChanged();
+}
+
+void AbstractNotationPaintView::setDrawingColor(const QColor& color)
+{
+    if (!color.isValid() || m_drawingColor == color) {
+        return;
+    }
+
+    m_drawingColor = color;
+    emit drawingStyleChanged();
+    scheduleRedraw();
+}
+
+void AbstractNotationPaintView::setDrawingWidth(qreal width)
+{
+    width = qBound<qreal>(0.25, width, 64.0);
+    if (qFuzzyCompare(m_drawingWidth, width)) {
+        return;
+    }
+
+    m_drawingWidth = width;
+    emit drawingStyleChanged();
+    scheduleRedraw();
+}
+
+bool AbstractNotationPaintView::handleDrawingMousePress(QMouseEvent* event)
+{
+    if (!m_drawingMode) {
+        return false;
+    }
+
+    if (event->button() != Qt::LeftButton || readonly() || !notation()) {
+        event->accept();
+        return true;
+    }
+
+    if (m_drawingTool == QLatin1String("select")) {
+        const PointF position = toLogical(event->position());
+        engraving::EngravingItem* item = notationInteraction() ? notationInteraction()->hitElement(position, 2.0f) : nullptr;
+        if (item && item->isImage()) {
+            notationInteraction()->noteInput()->endNoteInput();
+            m_drawingSelectionGesture = true;
+            return false;
+        }
+
+        notationInteraction()->clearSelection();
+        event->accept();
+        return true;
+    }
+
+    const PointF position = toLogical(event->position());
+    m_drawingStart = QPointF(position.x(), position.y());
+    m_drawingPath = QPainterPath(m_drawingStart);
+    m_isDrawing = true;
+    forceFocusIn();
+    event->accept();
+    scheduleRedraw();
+    return true;
+}
+
+bool AbstractNotationPaintView::handleDrawingMouseMove(QMouseEvent* event)
+{
+    if (!m_drawingMode || m_drawingSelectionGesture) {
+        return false;
+    }
+
+    if (!m_isDrawing) {
+        event->accept();
+        return true;
+    }
+
+    const PointF position = toLogical(event->position());
+    const QPointF current(position.x(), position.y());
+    if (m_drawingTool == QLatin1String("pencil")) {
+        m_drawingPath.lineTo(current);
+    } else {
+        updateDrawingPath(current);
+    }
+
+    event->accept();
+    scheduleRedraw();
+    return true;
+}
+
+bool AbstractNotationPaintView::handleDrawingMouseRelease(QMouseEvent* event)
+{
+    if (!m_drawingMode) {
+        return false;
+    }
+
+    if (m_drawingSelectionGesture && event->button() == Qt::LeftButton) {
+        m_drawingSelectionGesture = false;
+        return false;
+    }
+
+    if (event->button() != Qt::LeftButton) {
+        event->accept();
+        return true;
+    }
+
+    if (m_isDrawing) {
+        const PointF position = toLogical(event->position());
+        const QPointF current(position.x(), position.y());
+        if (m_drawingTool == QLatin1String("pencil")) {
+            m_drawingPath.lineTo(current);
+        } else {
+            updateDrawingPath(current);
+        }
+        m_isDrawing = false;
+        commitDrawing();
+    }
+
+    event->accept();
+    scheduleRedraw();
+    return true;
+}
+
+void AbstractNotationPaintView::updateDrawingPath(const QPointF& position)
+{
+    const QRectF rect = QRectF(m_drawingStart, position).normalized();
+    const QPointF top(rect.center().x(), rect.top());
+    const QPointF right(rect.right(), rect.center().y());
+    const QPointF bottom(rect.center().x(), rect.bottom());
+    const QPointF left(rect.left(), rect.center().y());
+    m_drawingPath = QPainterPath();
+
+    if (m_drawingTool == QLatin1String("line")) {
+        m_drawingPath.moveTo(m_drawingStart);
+        m_drawingPath.lineTo(position);
+    } else if (m_drawingTool == QLatin1String("rectangle")) {
+        m_drawingPath.addRect(rect);
+    } else if (m_drawingTool == QLatin1String("roundedRectangle")) {
+        m_drawingPath.addRoundedRect(rect, qMin(rect.width(), rect.height()) * 0.15, qMin(rect.width(), rect.height()) * 0.15);
+    } else if (m_drawingTool == QLatin1String("ellipse")) {
+        m_drawingPath.addEllipse(rect);
+    } else if (m_drawingTool == QLatin1String("triangle")) {
+        m_drawingPath.moveTo(rect.left(), rect.bottom());
+        m_drawingPath.lineTo(top);
+        m_drawingPath.lineTo(QPointF(rect.right(), rect.bottom()));
+        m_drawingPath.closeSubpath();
+    } else if (m_drawingTool == QLatin1String("rightTriangle")) {
+        m_drawingPath.moveTo(rect.left(), rect.top());
+        m_drawingPath.lineTo(rect.left(), rect.bottom());
+        m_drawingPath.lineTo(rect.right(), rect.bottom());
+        m_drawingPath.closeSubpath();
+    } else if (m_drawingTool == QLatin1String("diamond")) {
+        m_drawingPath.moveTo(top);
+        m_drawingPath.lineTo(right);
+        m_drawingPath.lineTo(bottom);
+        m_drawingPath.lineTo(left);
+        m_drawingPath.closeSubpath();
+    } else if (m_drawingTool == QLatin1String("star")) {
+        const QPointF points[] = {
+            QPointF(rect.center().x(), rect.top()), QPointF(rect.left() + rect.width() * 0.38, rect.top() + rect.height() * 0.38),
+            QPointF(rect.left(), rect.top() + rect.height() * 0.38), QPointF(rect.left() + rect.width() * 0.31, rect.center().y()),
+            QPointF(rect.left() + rect.width() * 0.19, rect.bottom()), QPointF(rect.center().x(), rect.bottom() - rect.height() * 0.24),
+            QPointF(rect.right() - rect.width() * 0.19, rect.bottom()), QPointF(rect.right() - rect.width() * 0.31, rect.center().y()),
+            QPointF(rect.right(), rect.top() + rect.height() * 0.38),
+            QPointF(rect.right() - rect.width() * 0.38, rect.top() + rect.height() * 0.38)
+        };
+        m_drawingPath.moveTo(points[0]);
+        for (int i = 1; i < 10; ++i) {
+            m_drawingPath.lineTo(points[i]);
+        }
+        m_drawingPath.closeSubpath();
+    } else if (m_drawingTool == QLatin1String("cross")) {
+        m_drawingPath.moveTo(top);
+        m_drawingPath.lineTo(bottom);
+        m_drawingPath.moveTo(left);
+        m_drawingPath.lineTo(right);
+    } else if (m_drawingTool == QLatin1String("filledArrow")) {
+        const qreal head = qMin(rect.width(), rect.height()) * 0.22;
+        m_drawingPath.moveTo(rect.left(), rect.center().y() - head * 0.35);
+        m_drawingPath.lineTo(rect.right() - head, rect.center().y() - head * 0.35);
+        m_drawingPath.lineTo(rect.right() - head, rect.top());
+        m_drawingPath.lineTo(rect.right(), rect.center().y());
+        m_drawingPath.lineTo(rect.right() - head, rect.bottom());
+        m_drawingPath.lineTo(rect.right() - head, rect.center().y() + head * 0.35);
+        m_drawingPath.lineTo(rect.left(), rect.center().y() + head * 0.35);
+        m_drawingPath.closeSubpath();
+    } else if (m_drawingTool == QLatin1String("arrow") || m_drawingTool == QLatin1String("doubleArrow")) {
+        const qreal head = qMin(rect.width(), rect.height()) * 0.22;
+        const QPointF start(rect.left(), rect.center().y());
+        const QPointF end(rect.right(), rect.center().y());
+        m_drawingPath.moveTo(start);
+        m_drawingPath.lineTo(end);
+        m_drawingPath.moveTo(end.x() - head, end.y() - head);
+        m_drawingPath.lineTo(end);
+        m_drawingPath.lineTo(end.x() - head, end.y() + head);
+        if (m_drawingTool == QLatin1String("doubleArrow")) {
+            m_drawingPath.moveTo(start.x() + head, start.y() - head);
+            m_drawingPath.lineTo(start);
+            m_drawingPath.lineTo(start.x() + head, start.y() + head);
+        }
+    }
+}
+
+QByteArray AbstractNotationPaintView::drawingSvg() const
+{
+    QRectF bounds = m_drawingPath.boundingRect();
+    const qreal padding = m_drawingWidth / 2.0;
+    bounds.adjust(-padding, -padding, padding, padding);
+    if (bounds.width() <= 0.0 || bounds.height() <= 0.0) {
+        return {};
+    }
+
+    const QPainterPath localPath = m_drawingPath.translated(-bounds.left(), -bounds.top());
+    QString pathData;
+    for (int i = 0; i < localPath.elementCount(); ++i) {
+        const QPainterPath::Element element = localPath.elementAt(i);
+        if (element.type == QPainterPath::MoveToElement) {
+            pathData += QStringLiteral("M %1 %2 ").arg(element.x, 0, 'g', 12).arg(element.y, 0, 'g', 12);
+        } else if (element.type == QPainterPath::LineToElement) {
+            pathData += QStringLiteral("L %1 %2 ").arg(element.x, 0, 'g', 12).arg(element.y, 0, 'g', 12);
+        } else if (element.type == QPainterPath::CurveToElement && i + 2 < localPath.elementCount()) {
+            const QPainterPath::Element control2 = localPath.elementAt(i + 1);
+            const QPainterPath::Element end = localPath.elementAt(i + 2);
+            pathData += QStringLiteral("C %1 %2 %3 %4 %5 %6 ")
+                        .arg(element.x, 0, 'g', 12).arg(element.y, 0, 'g', 12)
+                        .arg(control2.x, 0, 'g', 12).arg(control2.y, 0, 'g', 12)
+                        .arg(end.x, 0, 'g', 12).arg(end.y, 0, 'g', 12);
+            i += 2;
+        }
+    }
+
+    const QString color = m_drawingColor.name(QColor::HexRgb);
+    const QString fill = m_drawingTool == QLatin1String("filledArrow") ? color : QStringLiteral("none");
+    const QString svg
+        = QStringLiteral(
+              "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%1\" height=\"%2\" viewBox=\"0 0 %1 %2\"><path d=\"%3\" fill=\"%4\" stroke=\"%5\" stroke-opacity=\"%6\" stroke-width=\"%7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>")
+          .arg(bounds.width(), 0, 'g', 12).arg(bounds.height(), 0, 'g', 12).arg(pathData, fill, color)
+          .arg(m_drawingColor.alphaF(), 0, 'g', 6).arg(m_drawingWidth, 0, 'g', 12);
+    return svg.toUtf8();
+}
+
+void AbstractNotationPaintView::commitDrawing()
+{
+    if (m_drawingPath.isEmpty() || !notationInteraction()) {
+        return;
+    }
+
+    QRectF bounds = m_drawingPath.boundingRect();
+    const qreal padding = m_drawingWidth / 2.0;
+    bounds.adjust(-padding, -padding, padding, padding);
+    const muse::PointF position(bounds.left(), bounds.top());
+    const muse::SizeF size(bounds.width(), bounds.height());
+    notationInteraction()->addVectorDrawing(drawingSvg(), position, size);
+    m_drawingPath = QPainterPath();
 }
 
 void AbstractNotationPaintView::clear()
@@ -1736,6 +2103,7 @@ void AbstractNotationPaintView::setPublishMode(bool arg)
 
     m_publishMode = arg;
     if (m_publishMode) {
+        setDrawingMode(false);
         setReadonly(true);
     }
     emit publishModeChanged();
@@ -1758,6 +2126,12 @@ void AbstractNotationPaintView::setIsMainView(bool isMainView)
     }
 
     m_isMainView = isMainView;
+    if (m_isMainView) {
+        setDrawingTool(configuration()->drawingTool());
+    }
+    if (m_isMainView && configuration()->drawingModeEnabled() && !readonly() && !publishMode()) {
+        setDrawingMode(true);
+    }
     emit isMainViewChanged(m_isMainView);
 }
 

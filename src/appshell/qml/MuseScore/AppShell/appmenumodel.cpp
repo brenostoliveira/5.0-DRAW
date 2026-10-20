@@ -291,6 +291,8 @@ MenuItem* AppMenuModel::makeViewMenu()
         makeMenuItem(DOCK_TOGGLE_PERCUSSION_COMMAND),
         makeMenuItem(OPEN_PLAYBACK_SETUP_COMMAND),
         makeSeparator(),
+        makeMenuItem(TOGGLE_DRAWING_MODE_COMMAND),
+        makeSeparator(),
         makeMenu(TranslatableString("appshell/menu/view", "&Toolbars"), {
             makeMenuItem(DOCK_TOGGLE_PLAYBACK_COMMAND),
             makeMenuItem(DOCK_TOGGLE_NOTEINPUT_COMMAND),

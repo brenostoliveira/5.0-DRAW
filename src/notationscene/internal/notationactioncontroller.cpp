@@ -568,6 +568,7 @@ void NotationActionController::init()
                     VoiceAssignment::ALL_VOICE_IN_STAFF);
 
     registerCommand(TOGGLE_AUTOMATION_COMMAND, &Controller::toggleAutomation);
+    registerCommand(TOGGLE_DRAWING_MODE_COMMAND, &Controller::toggleDrawingMode);
     registerCommandWithParams(SELECT_AUTOMATION_TYPE_COMMAND, &Controller::selectAutomationType);
 
     // TAB
@@ -2792,6 +2793,11 @@ void NotationActionController::toggleAutomation()
 
     const bool isEnabled = masterNotation->automation()->isAutomationModeEnabled();
     masterNotation->automation()->setAutomationModeEnabled(!isEnabled);
+}
+
+void NotationActionController::toggleDrawingMode()
+{
+    sceneConfiguration()->setDrawingModeEnabled(!sceneConfiguration()->drawingModeEnabled());
 }
 
 muse::Ret NotationActionController::selectAutomationType(const muse::rcommand::Params& params)

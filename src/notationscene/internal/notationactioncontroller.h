@@ -260,6 +260,7 @@ private:
     void checkForScoreCorruptions();
 
     void toggleAutomation();
+    void toggleDrawingMode();
     muse::Ret selectAutomationType(const muse::rcommand::Params& params);
 
     // commands

@@ -367,6 +367,10 @@ void NotationCommandsState::init()
         updateCommandStates({ TOGGLE_AUTOMATION_COMMAND });
     });
 
+    sceneConfiguration()->drawingModeEnabledChanged().onNotify(this, [this]() {
+        updateCommandStates({ TOGGLE_DRAWING_MODE_COMMAND });
+    });
+
     controller()->debuggingOptionsChanged().onNotify(this, [this]() {
         updateCommandStates(DEBUG_COMMANDS);
     });
@@ -509,6 +513,10 @@ CommandState NotationCommandsState::doCommandState(const Command& command) const
 
     if (command == TOGGLE_AUTOMATION_COMMAND) {
         return CommandState(true, controller()->isAutomationModeEnabled());
+    }
+
+    if (command == TOGGLE_DRAWING_MODE_COMMAND) {
+        return CommandState(true, sceneConfiguration()->drawingModeEnabled());
     }
 
     if (muse::contains(DEBUG_COMMANDS, command)) {

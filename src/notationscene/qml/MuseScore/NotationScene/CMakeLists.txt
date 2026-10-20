@@ -167,6 +167,7 @@ qt_add_qml_module(notationscene_qml
     QML_FILES
         AbstractElementPopup.qml
         ConcertPitchControl.qml
+        DrawingToolIcon.qml
         EditGridSizeDialog.qml
         EditPercussionShortcutDialog.qml
         elementpopups/CapoPopup.qml

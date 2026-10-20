@@ -150,6 +150,134 @@ FocusScope {
                         }
                     }
 
+                    Rectangle {
+                        id: drawingToolsPanel
+                        z: 20
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 12
+                        width: 196
+                        height: toolsColumn.implicitHeight + 20
+                        radius: 4
+                        color: ui.theme.backgroundPrimaryColor
+                        border.color: ui.theme.strokeColor
+                        border.width: 1
+
+                        Column {
+                            id: toolsColumn
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 8
+
+                            RowLayout {
+                                width: parent.width
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: qsTrc("notation", "Drawing mode")
+                                    color: ui.theme.fontPrimaryColor
+                                    font: ui.theme.bodyFont
+                                }
+                                Switch {
+                                    checked: notationView.drawingMode
+                                    enabled: !notationView.readOnly && !notationView.publishMode
+                                    onToggled: notationView.drawingMode = checked
+                                }
+                            }
+
+                            Column {
+                                width: parent.width
+                                spacing: 4
+                                visible: notationView.drawingMode
+
+                                Repeater {
+                                    model: [
+                                        { name: qsTrc("notation", "Select"), tool: "select" },
+                                        { name: qsTrc("notation", "Pencil"), tool: "pencil" },
+                                        { name: qsTrc("notation", "Line"), tool: "line" },
+                                        { name: qsTrc("notation", "Rectangle"), tool: "rectangle" },
+                                        { name: qsTrc("notation", "Ellipse"), tool: "ellipse" },
+                                        { name: qsTrc("notation", "Triangle"), tool: "triangle" },
+                                        { name: qsTrc("notation", "Right triangle"), tool: "rightTriangle" },
+                                        { name: qsTrc("notation", "Diamond"), tool: "diamond" },
+                                        { name: qsTrc("notation", "Rounded rectangle"), tool: "roundedRectangle" },
+                                        { name: qsTrc("notation", "Star"), tool: "star" },
+                                        { name: qsTrc("notation", "Cross"), tool: "cross" },
+                                        { name: qsTrc("notation", "Arrow"), tool: "arrow" },
+                                        { name: qsTrc("notation", "Double arrow"), tool: "doubleArrow" },
+                                        { name: qsTrc("notation", "Filled arrow"), tool: "filledArrow" }
+                                    ]
+
+                                    delegate: Button {
+                                        required property var modelData
+                                        width: parent.width
+                                        height: 28
+                                        checkable: true
+                                        checked: notationView.drawingTool === modelData.tool
+                                        onClicked: notationView.drawingTool = modelData.tool
+
+                                        contentItem: RowLayout {
+                                            spacing: 8
+                                            DrawingToolIcon {
+                                                Layout.preferredWidth: 20
+                                                Layout.preferredHeight: 20
+                                                tool: modelData.tool
+                                            }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: modelData.name
+                                                color: ui.theme.fontPrimaryColor
+                                                font: ui.theme.bodyFont
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+                                        }
+                                        background: Rectangle {
+                                            radius: 3
+                                            color: parent.checked ? ui.theme.accentColor : (parent.hovered ? ui.theme.buttonColor : "transparent")
+                                            border.color: parent.checked ? ui.theme.accentColor : "transparent"
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                width: parent.width
+                                visible: notationView.drawingMode
+
+                                Text {
+                                    text: qsTrc("notation", "Color")
+                                    color: ui.theme.fontPrimaryColor
+                                    font: ui.theme.bodyFont
+                                }
+                                ComboBox {
+                                    Layout.fillWidth: true
+                                    model: [qsTrc("notation", "Black"), qsTrc("notation", "Red"), qsTrc("notation", "Blue"), qsTrc("notation", "Green")]
+                                    onActivated: {
+                                        const colors = ["#1f1f1f", "#c62828", "#1565c0", "#2e7d32"]
+                                        notationView.drawingColor = colors[currentIndex]
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                width: parent.width
+                                visible: notationView.drawingMode
+
+                                Text {
+                                    text: qsTrc("notation", "Width")
+                                    color: ui.theme.fontPrimaryColor
+                                    font: ui.theme.bodyFont
+                                }
+                                Slider {
+                                    Layout.fillWidth: true
+                                    from: 0.5
+                                    to: 12
+                                    value: notationView.drawingWidth
+                                    onMoved: notationView.drawingWidth = value
+                                }
+                            }
+                        }
+                    }
+
                     onActiveFocusRequested: {
                         fakeNavCtrl.requestActive()
                     }

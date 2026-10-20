@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <QString>
+
 #include "modularity/imoduleinterface.h"
 #include "async/notification.h"
 #include "types/retval.h"
@@ -39,6 +41,14 @@ public:
     virtual bool isSmoothPanning() const = 0;
     virtual void setIsSmoothPanning(bool value) = 0;
     virtual muse::async::Notification isSmoothPanningChanged() const = 0;
+
+    virtual bool drawingModeEnabled() const = 0;
+    virtual void setDrawingModeEnabled(bool enabled) = 0;
+    virtual muse::async::Notification drawingModeEnabledChanged() const = 0;
+
+    virtual QString drawingTool() const = 0;
+    virtual void setDrawingTool(const QString& tool) = 0;
+    virtual muse::async::Notification drawingToolChanged() const = 0;
 
     virtual bool isLimitCanvasScrollArea() const = 0;
     virtual void setIsLimitCanvasScrollArea(bool limited) = 0;

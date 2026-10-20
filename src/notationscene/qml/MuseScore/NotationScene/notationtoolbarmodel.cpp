@@ -42,7 +42,8 @@ void NotationToolBarModel::load()
     std::vector<rcommand::Command> commands = {
         OPEN_PARTS_COMMAND,
         appshell::DOCK_TOGGLE_MIXER_COMMAND,
-        TOGGLE_AUTOMATION_COMMAND
+        TOGGLE_AUTOMATION_COMMAND,
+        TOGGLE_DRAWING_MODE_COMMAND
     };
 
     ToolBarItemList items;

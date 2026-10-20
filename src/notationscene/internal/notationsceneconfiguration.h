@@ -38,6 +38,14 @@ public:
     void setIsSmoothPanning(bool value) override;
     muse::async::Notification isSmoothPanningChanged() const override;
 
+    bool drawingModeEnabled() const override;
+    void setDrawingModeEnabled(bool enabled) override;
+    muse::async::Notification drawingModeEnabledChanged() const override;
+
+    QString drawingTool() const override;
+    void setDrawingTool(const QString& tool) override;
+    muse::async::Notification drawingToolChanged() const override;
+
     bool isLimitCanvasScrollArea() const override;
     void setIsLimitCanvasScrollArea(bool limited) override;
     muse::async::Notification isLimitCanvasScrollAreaChanged() const override;
@@ -67,6 +75,10 @@ public:
 
 private:
     muse::async::Notification m_isSmoothPanningChanged;
+    bool m_drawingModeEnabled = false;
+    muse::async::Notification m_drawingModeEnabledChanged;
+    QString m_drawingTool = QStringLiteral("select");
+    muse::async::Notification m_drawingToolChanged;
     muse::async::Notification m_isLimitCanvasScrollAreaChanged;
     muse::ValCh<int> m_pianoKeyboardNumberOfKeys;
     muse::async::Notification m_percussionPanelUseNotationPreviewChanged;

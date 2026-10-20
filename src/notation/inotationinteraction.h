@@ -24,6 +24,8 @@
 
 #include <functional>
 
+#include <QByteArray>
+
 #include "async/notification.h"
 
 #include "inotation_fwd.h"
@@ -252,6 +254,7 @@ public:
 
     virtual muse::Ret canAddImageToItem(const EngravingItem* item) const = 0;
     virtual void addImageToItem(const muse::io::path_t& imagePath, EngravingItem* item) = 0;
+    virtual bool addVectorDrawing(const QByteArray& svg, const muse::PointF& position, const muse::SizeF& size) { return false; }
 
     virtual void addFiguredBass() = 0;
     virtual void addFretboardDiagram() = 0;

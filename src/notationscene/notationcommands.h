@@ -488,6 +488,7 @@ inline static const muse::rcommand::Command UNSET_VISIBLE_COMMAND("command://not
 inline static const muse::rcommand::Command TOGGLE_AUTOPLACE_COMMAND("command://notation/toggle-autoplace");
 inline static const muse::rcommand::Command AUTOPLACE_ENABLED_COMMAND("command://notation/autoplace-enabled");
 inline static const muse::rcommand::Command TOGGLE_AUTOMATION_COMMAND("command://notation/toggle-automation");
+inline static const muse::rcommand::Command TOGGLE_DRAWING_MODE_COMMAND("command://notation/toggle-drawing-mode");
 inline static const muse::rcommand::Command SELECT_AUTOMATION_TYPE_COMMAND("command://notation/select-automation-type"); // with params
 
 // TAB commands
