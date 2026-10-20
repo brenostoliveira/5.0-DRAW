@@ -19,30 +19,26 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#pragma once
 
-#include "extensioncontextresolver.h"
+#include "modularity/imoduleinterface.h"
 
-#include "extensions/extensionstypes.h"
+#include "async/channel.h"
 
-using namespace mu::context;
+class QString;
 
-void ExtensionContextResolver::init()
+namespace mu::project {
+class IDeleteCloudScoreScenario : MODULE_CONTEXT_INTERFACE
 {
-    globalContext()->currentProjectChanged().onNotify(this, [this]() {
-        m_contextChanged.notify();
-    });
-}
+    INTERFACE_ID(IDeleteCloudScoreScenario)
 
-bool ExtensionContextResolver::isContextAllowed(const std::string& context) const
-{
-    if (context == muse::extensions::PROJECT_OPENED_CONTEXT) {
-        return globalContext()->currentProject() != nullptr;
-    }
+public:
+    virtual ~IDeleteCloudScoreScenario() = default;
 
-    return true;
-}
+    //! Confirms with the user, then deletes the score from MuseScore.com along with its local copy
+    virtual void deleteScore(int scoreId, const QString& scoreName) = 0;
 
-muse::async::Notification ExtensionContextResolver::contextChanged() const
-{
-    return m_contextChanged;
+    //! Emitted once the score has been deleted from MuseScore.com
+    virtual muse::async::Channel<int /*scoreId*/> scoreDeleted() const = 0;
+};
 }

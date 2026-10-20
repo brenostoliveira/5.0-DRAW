@@ -19,22 +19,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 #pragma once
 
 #include <gmock/gmock.h>
 
-#include "context/iplaybackstate.h"
+#include <QString>
 
-namespace mu::context {
-class PlaybackStateMock : public IPlaybackState
+#include "project/ideletecloudscorescenario.h"
+
+namespace mu::project {
+class DeleteCloudScoreScenarioMock : public IDeleteCloudScoreScenario
 {
 public:
-    MOCK_METHOD(bool, isPlaying, (), (const, override));
-    MOCK_METHOD(muse::audio::PlaybackStatus, playbackStatus, (), (const, override));
-    MOCK_METHOD(muse::async::Channel<muse::audio::PlaybackStatus>, playbackStatusChanged, (), (const, override));
-
-    MOCK_METHOD(muse::audio::secs_t, playbackPosition, (), (const, override));
-    MOCK_METHOD(muse::async::Channel<muse::audio::secs_t>, playbackPositionChanged, (), (const, override));
+    MOCK_METHOD(void, deleteScore, (int, const QString&), (override));
+    MOCK_METHOD(muse::async::Channel<int>, scoreDeleted, (), (const, override));
 };
 }
