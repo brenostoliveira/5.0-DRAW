@@ -34,7 +34,7 @@ Adds a drawing-mode entry in the notation interface and the View menu. The palet
 | `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 170 | Registers the drawing icon component in the QML module. |
 | `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 153–280 | Adds the palette, tool selection, color and stroke-width controls. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.h` | 26–28, 74–77, 171–179, 204–206, 301–306, 360–367 | Declares drawing properties, signals, pointer handlers and temporary path state. |
-| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 28–35, 154–174, 800–807, 1583–1874, 2106, 2129–2134 | Implements mode synchronization, previews, pointer gestures, SVG serialization and score insertion. |
+| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 28–35, 154–174, 800–807, 1565–1887, 2118–2120, 2141–2147 | Implements mode synchronization, previews, pointer gestures, SVG serialization and score insertion. |
 
 ## 5.0-DRAW-R2 — Additional geometric tools
 
@@ -53,7 +53,7 @@ No additional source files.
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 31–39 | Adds the geometric tool icons. |
 | `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 199–207 | Exposes the additional tools with extractable English labels. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.h` | 304 | Declares the shared path-update helper. |
-| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 803, 1609–1615, 1742–1857 | Constructs the supported shapes and preserves filled-arrow appearance during preview and SVG serialization. |
+| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 803, 1593–1611, 1755–1870 | Constructs the supported shapes and preserves filled-arrow appearance during preview and SVG serialization. |
 
 ## 5.0-DRAW-R3 — Windows deployment from paths containing spaces
 
@@ -79,13 +79,13 @@ Uses the standard notation-toolbar action component to display the pencil icon f
 
 Selection is the initial tool. The latest tool is retained in memory for the application session and restored when the main score view is recreated or drawing mode is re-enabled.
 
-Activating drawing mode ends musical note entry and element editing and clears the previous selection. Drawing pointer gestures are consumed by the drawing tools; selection gestures on drawing images use the existing image interaction without score-selection modifiers. Musical double-click, hover and context-menu behavior is suppressed while drawing mode is active. Turning drawing mode off restores the ordinary pointer and context-menu routes. Mode switching leaves inserted drawings in the score.
+Activating drawing mode ends musical note entry and element editing and clears the previous selection. Drawing pointer gestures are consumed by the drawing tools; selection gestures on drawing images use the notation interaction interface directly, as refined in R5. Musical double-click, hover and context-menu behavior is suppressed while drawing mode is active. Turning drawing mode off restores the ordinary pointer and context-menu routes. Mode switching leaves inserted drawings in the score.
 
 ### Files added
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `DRAWING_CHANGELOG.md` | 1–108 | Records feature revisions, changed-file locations, reasons and validation status. |
+| `DRAWING_CHANGELOG.md` | 1–125 | Records feature revisions, changed-file locations, reasons and validation status. |
 
 ### Files modified
 
@@ -97,12 +97,29 @@ Activating drawing mode ends musical note entry and element editing and clears t
 | `src/notationscene/internal/notationsceneconfiguration.h` | 45–47, 80–81 | Stores the last tool, initially selection, without persistent settings. |
 | `src/notationscene/internal/notationsceneconfiguration.cpp` | 134–152 | Implements session tool access and change notification. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.h` | 362 | Tracks whether a drawing-image selection gesture owns the pointer sequence. |
-| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 166–174, 1351–1419, 1473–1477, 1583–1740, 2129–2134 | Restores the session tool, separates drawing and musical pointer routes, and preserves normal context-menu handling when drawing mode is off. |
+| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 166–174, 1351–1401, 1455–1459, 1565–1753, 2141–2147 | Restores the session tool, separates drawing and musical pointer routes, and preserves normal context-menu handling when drawing mode is off. |
+
+## 5.0-DRAW-R5 — Isolate drawing-image selection and movement
+
+### Modified functionality
+
+Selects the image identified by the drawing tool directly through the notation interaction interface. Movement begins after the pointer crosses the drag threshold and is restricted to image elements. This prevents the musical input controller from performing another hit test and selecting a different score element. Releasing the pointer or leaving drawing mode completes the active undoable drag.
+
+### Files added
+
+No additional source files.
+
+### Files modified
+
+| File | Locations | Reason |
+| --- | --- | --- |
+| `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 1355–1357, 1367–1369, 1393–1395, 1571–1573, 1650–1659, 1682–1698, 1723–1731 | Keeps drawing selection and image movement inside the drawing gesture handlers, completes active drag transactions, and preserves ordinary musical input routing when drawing mode is off. |
+| `DRAWING_CHANGELOG.md` | 37, 55, 81, 87, 100, 102–125 | Updates source locations, records R5 and keeps the documented validation boundary current. |
 
 ## Validation status
 
 - The Windows development build completed with Qt 6.11.2, MSVC 2022 and the RelWithDebInfo configuration before R4.
 - Portable compilation and Qt dependency deployment completed successfully through R3. The package includes the PortableApps launcher, Qt runtime libraries and Windows platform plugin. Portable-mode headers were checked.
-- R4 received source review, C++ formatting and whitespace inspection. It has not been compiled or checked in the running application.
+- R4 and R5 received source review, C++ formatting and whitespace inspection. They have not been compiled or checked in the running application.
 - Automated tests were not executed. Musical editing, drawing interaction, persistence and portable runtime behavior still require application verification.
 - Source labels are in English and use translation extraction. Translation catalogs are unchanged.

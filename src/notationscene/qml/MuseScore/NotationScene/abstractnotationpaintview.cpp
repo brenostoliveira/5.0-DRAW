@@ -1353,13 +1353,7 @@ void AbstractNotationPaintView::mousePressEvent(QMouseEvent* event)
     }
 
     if (isInited()) {
-        if (m_drawingMode) {
-            QMouseEvent drawingEvent(event->type(), event->position(), event->scenePosition(), event->globalPosition(),
-                                     event->button(), event->buttons(), Qt::NoModifier, event->pointingDevice());
-            m_inputController->mousePressEvent(&drawingEvent);
-        } else {
-            m_inputController->mousePressEvent(event);
-        }
+        m_inputController->mousePressEvent(event);
     }
 }
 
@@ -1371,13 +1365,7 @@ void AbstractNotationPaintView::mouseMoveEvent(QMouseEvent* event)
     }
 
     if (isInited()) {
-        if (m_drawingMode) {
-            QMouseEvent drawingEvent(event->type(), event->position(), event->scenePosition(), event->globalPosition(),
-                                     event->button(), event->buttons(), Qt::NoModifier, event->pointingDevice());
-            m_inputController->mouseMoveEvent(&drawingEvent);
-        } else {
-            m_inputController->mouseMoveEvent(event);
-        }
+        m_inputController->mouseMoveEvent(event);
     }
 }
 
@@ -1403,13 +1391,7 @@ void AbstractNotationPaintView::mouseReleaseEvent(QMouseEvent* event)
     }
 
     if (isInited()) {
-        if (m_drawingMode) {
-            QMouseEvent drawingEvent(event->type(), event->position(), event->scenePosition(), event->globalPosition(),
-                                     event->button(), event->buttons(), Qt::NoModifier, event->pointingDevice());
-            m_inputController->mouseReleaseEvent(&drawingEvent);
-        } else {
-            m_inputController->mouseReleaseEvent(event);
-        }
+        m_inputController->mouseReleaseEvent(event);
     }
 }
 
@@ -1586,6 +1568,10 @@ void AbstractNotationPaintView::setDrawingMode(bool enabled)
         return;
     }
 
+    if (m_drawingSelectionGesture && notationInteraction() && notationInteraction()->isDragStarted()) {
+        notationInteraction()->endDrag();
+    }
+
     m_drawingMode = enabled;
     m_isDrawing = false;
     m_drawingSelectionGesture = false;
@@ -1663,8 +1649,13 @@ bool AbstractNotationPaintView::handleDrawingMousePress(QMouseEvent* event)
         engraving::EngravingItem* item = notationInteraction() ? notationInteraction()->hitElement(position, 2.0f) : nullptr;
         if (item && item->isImage()) {
             notationInteraction()->noteInput()->endNoteInput();
+            notationInteraction()->endEditElement();
+            notationInteraction()->select({ item }, SelectType::SINGLE);
+            m_drawingStart = QPointF(position.x(), position.y());
             m_drawingSelectionGesture = true;
-            return false;
+            event->accept();
+            scheduleRedraw();
+            return true;
         }
 
         notationInteraction()->clearSelection();
@@ -1684,8 +1675,25 @@ bool AbstractNotationPaintView::handleDrawingMousePress(QMouseEvent* event)
 
 bool AbstractNotationPaintView::handleDrawingMouseMove(QMouseEvent* event)
 {
-    if (!m_drawingMode || m_drawingSelectionGesture) {
+    if (!m_drawingMode) {
         return false;
+    }
+
+    if (m_drawingSelectionGesture) {
+        engraving::EngravingItem* item = notationInteraction()->selection()->element();
+        const QPointF physicalStart = fromLogical(PointF::fromQPointF(m_drawingStart)).toQPointF();
+        if (item && item->isImage() && item->isMovable()
+            && (notationInteraction()->isDragStarted() || (event->position() - physicalStart).manhattanLength() > 4.0)) {
+            if (!notationInteraction()->isDragStarted()) {
+                notationInteraction()->startDrag({ item }, item->offset(), [](const engraving::EngravingItem* element) {
+                    return element->isImage();
+                });
+            }
+            notationInteraction()->drag(PointF::fromQPointF(m_drawingStart), toLogical(event->position()), DragMode::BothXY);
+        }
+        event->accept();
+        scheduleRedraw();
+        return true;
     }
 
     if (!m_isDrawing) {
@@ -1714,7 +1722,12 @@ bool AbstractNotationPaintView::handleDrawingMouseRelease(QMouseEvent* event)
 
     if (m_drawingSelectionGesture && event->button() == Qt::LeftButton) {
         m_drawingSelectionGesture = false;
-        return false;
+        if (notationInteraction()->isDragStarted()) {
+            notationInteraction()->endDrag();
+        }
+        event->accept();
+        scheduleRedraw();
+        return true;
     }
 
     if (event->button() != Qt::LeftButton) {
