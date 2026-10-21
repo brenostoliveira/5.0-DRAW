@@ -85,7 +85,7 @@ Activating drawing mode ends musical note entry and element editing and clears t
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `DRAWING_CHANGELOG.md` | 1–312 | Records feature revisions, changed-file locations, reasons and validation status. |
+| `DRAWING_CHANGELOG.md` | 1–333 | Records feature revisions, changed-file locations, reasons and validation status. |
 
 ### Files modified
 
@@ -260,7 +260,7 @@ Bézier, painting/gradients, path repetition, nodes/anchors, eraser, text, group
 
 | File | Locations | Reason |
 | --- | --- | --- |
-| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 91, 116–131, 273–299 | Registers the narrow native dock, its side-drop destinations and visibility policy, and supplies the active score view. |
+| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 91, 116–138, 280–312 | Registers the narrow native dock, its side-drop destinations and visibility policy, and supplies the active score view. |
 | `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | removed previous 153–280; current 165 | Removes the fixed overlay so drawing controls belong to the docked panel and no longer cover the score. |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 40–51 | Adds theme-colored vector icons for the additional panel groups. |
 | `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 171 | Registers the new panel with the notation-scene QML module. |
@@ -292,10 +292,29 @@ Pencil and geometric-tool subpanels expose existing shared color and stroke-widt
 | --- | --- | --- |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 32, 139–158, 181–184 | Emits contextual-panel requests from available tools and relocates color/width controls into the colors subpanel. |
 | `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 55–65 | Hosts contextual panels separately from the main dock and exposes the panel-opening entry point. |
-| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 298 | Connects main-panel requests to the active notation view's subpanel host. |
+| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 310 | Connects main-panel requests to the active notation view's subpanel host. |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 52 | Adds the themed vector pin icon. |
 | `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 172–174 | Registers the contextual panel, host and shared style controls in the QML module. |
 | `DRAWING_CHANGELOG.md` | refreshed R1/R2/R7 references, R8 and validation status | Documents contextual behavior, changed locations, reasons and validation limits. |
+
+## 5.0-DRAW-R9 — Restore opening the main drawing panel
+
+### Modified functionality
+
+Fixes the main drawing panel remaining hidden when Draw is activated. The runtime log reported that the page's dock-opening method was not a callable QML function. That C++ method is not exposed to QML. Visibility now uses the drawing dock's existing QML-invokable open, close and open-state methods.
+
+The desired visibility is reapplied when the drawing dock finishes initialization. Opening and closing are skipped when the dock already has the requested state. The existing Draw-mode and independent Keep visible policies are retained.
+
+### Files added
+
+No additional source files.
+
+### Files modified
+
+| File | Locations | Reason |
+| --- | --- | --- |
+| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 118–130, 284–288 | Replaces the unavailable page-method call with the dock's exposed operations and reapplies visibility after initialization. |
+| `DRAWING_CHANGELOG.md` | R7/R8 source references, R9 and validation status | Records the confirmed runtime cause, correction, current source locations and verification limits. |
 
 ## Validation status
 
@@ -308,5 +327,7 @@ Pencil and geometric-tool subpanels expose existing shared color and stroke-widt
 - R8 compiled successfully and was installed and deployed with the Qt dependencies and official PortableApps launcher. It has not been launched or exercised in the application. Pinning, replacement, placement under window resizing, scrolling, focus and live style synchronization require runtime verification.
 - The local build helper now records native warning output without stopping the pipeline and checks each native process exit status. This orchestration correction is outside the repository; official build scripts are unchanged. The R8 build, installation and Qt deployment completed successfully. A final artifact-hash error was repaired using the .NET SHA256 implementation; the installed executable hash matches the compiled executable. The helper correction remains outside the repository.
 - Portable artifact identity through R8: the installed application executable has SHA256 `D8D2E1A8F12B63ED522DAD9ED1C7C24CC1D594E1B385F9D3D3B8FFCAA32CA8FA`. Required launcher, Qt runtime and platform-plugin files were confirmed present.
+- Runtime observation after the R8 build confirmed that the main drawing panel did not open. The application log identifies a QML call to an unavailable page method; R9 corrects that call. R9 compiled, installed and completed Qt deployment and PortableApps packaging successfully. The contributor confirmed that the main drawing panel opens when drawing mode is activated. This confirmation covers panel opening; the remaining panel and drawing interactions are not yet verified.
+- Portable artifact identity through R9: the installed application executable has SHA256 `77D2FF3E550F54D2AC5559641B32881824DA8CF274819DA0FB884B198433D986`. Required launcher, Qt runtime and platform-plugin files were confirmed present.
 - Automated tests were not executed. Musical editing, drawing interaction, persistence and portable runtime behavior still require application verification.
 - Source labels are in English and use translation extraction. Translation catalogs are unchanged.

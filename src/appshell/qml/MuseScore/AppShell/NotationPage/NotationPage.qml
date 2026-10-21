@@ -116,9 +116,16 @@ DockPage {
     property bool keepDrawingPanelVisible: false
 
     function updateDrawingPanelVisibility() {
-        if (drawingPanel.inited) {
-            root.setDockOpen(drawingPanel.objectName, root.keepDrawingPanelVisible
-                             || (Boolean(root.notationView) && root.notationView.drawingMode))
+        if (!drawingPanel.inited) {
+            return
+        }
+
+        const shouldOpen = root.keepDrawingPanelVisible
+                           || (Boolean(root.notationView) && root.notationView.drawingMode)
+        if (shouldOpen && !drawingPanel.isOpen()) {
+            drawingPanel.open()
+        } else if (!shouldOpen && drawingPanel.isOpen()) {
+            drawingPanel.close()
         }
     }
 
@@ -274,6 +281,11 @@ DockPage {
         DockPanel {
             id: drawingPanel
             objectName: "drawingToolsPanel"
+            onInitedChanged: {
+                if (inited) {
+                    Qt.callLater(root.updateDrawingPanelVisibility)
+                }
+            }
             title: qsTrc("notation", "Drawing tools")
             visible: false
             width: 168
