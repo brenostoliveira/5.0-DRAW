@@ -27,6 +27,8 @@ Rectangle {
     required property string title
     required property NavigationSection navigationSection
     required property int navigationOrder
+    property string hintDescription: ""
+    DrawingToolInfo { id: toolInfo }
     property bool pinned: false
     property bool hasPendingConfirmation: false
     signal closeRequested()
@@ -66,20 +68,36 @@ Rectangle {
         RowLayout {
             id: headerRow
             Layout.fillWidth: true
+            Layout.minimumHeight: 36
+            Layout.preferredHeight: 36
+            Layout.maximumHeight: 36
             spacing: 4
             StyledTextLabel {
                 Layout.fillWidth: true
+                font: ui.theme.bodyBoldFont
+                maximumLineCount: 2
                 text: root.title
                 horizontalAlignment: Text.AlignLeft
                 wrapMode: Text.WordWrap
             }
             FlatButton {
+                id: pinControl
+                Layout.preferredWidth: 30
                 width: 30
                 height: 30
                 minWidth: 0
                 margins: 0
                 accentButton: root.pinned
                 toolTipTitle: root.pinned ? qsTrc("notation", "Unpin subpanel") : qsTrc("notation", "Pin subpanel")
+                toolTipDescription: qsTrc("notation", "Keep this subpanel open when another tool panel is opened.")
+                toolTipShowLocked: true
+                DrawingControlHint {
+                    control: pinControl
+                    title: pinControl.toolTipTitle
+                    description: pinControl.toolTipDescription
+                    interacting: pinControl.mouseArea.pressed
+                    onHintChanged: function(description) { root.hintDescription = description }
+                }
                 accessible.checked: root.pinned
                 navigation.panel: panelNavigation
                 navigation.order: 0
@@ -96,12 +114,23 @@ Rectangle {
                 onClicked: root.pinRequested(!root.pinned)
             }
             FlatButton {
+                id: closeControl
+                Layout.preferredWidth: 30
                 width: 30
                 height: 30
                 minWidth: 0
                 margins: 0
                 icon: IconCode.CLOSE_X_ROUNDED
                 toolTipTitle: qsTrc("notation", "Close subpanel")
+                toolTipDescription: qsTrc("notation", "Close this subpanel without changing the active tool.")
+                toolTipShowLocked: true
+                DrawingControlHint {
+                    control: closeControl
+                    title: closeControl.toolTipTitle
+                    description: closeControl.toolTipDescription
+                    interacting: closeControl.mouseArea.pressed
+                    onHintChanged: function(description) { root.hintDescription = description }
+                }
                 navigation.panel: panelNavigation
                 navigation.order: 1
                 onClicked: root.closeRequested()
@@ -122,10 +151,33 @@ Rectangle {
                 width: parent.width - 10
                 spacing: 10
 
+                StyledTextLabel {
+                    Layout.fillWidth: true
+                    Layout.minimumHeight: 76
+                    Layout.preferredHeight: 76
+                    Layout.maximumHeight: 76
+                    text: root.hintDescription || toolInfo.description(root.tool)
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignTop
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 4
+                }
+
                 FlatButton {
+                    id: activateControl
                     visible: root.tool !== "colors"
                     Layout.fillWidth: true
                     text: qsTrc("notation", "Use tool")
+                    toolTipTitle: root.title
+                    toolTipDescription: toolInfo.description(root.tool)
+                    toolTipShowLocked: true
+                    DrawingControlHint {
+                        control: activateControl
+                        title: activateControl.toolTipTitle
+                        description: activateControl.toolTipDescription
+                        interacting: activateControl.mouseArea.pressed
+                        onHintChanged: function(description) { root.hintDescription = description }
+                    }
                     accentButton: Boolean(root.paintView) && root.paintView.drawingTool === root.tool
                     navigation.panel: panelNavigation
                     navigation.order: 2
@@ -145,6 +197,7 @@ Rectangle {
                     Layout.fillWidth: true
                     paintView: root.paintView
                     navigationPanel: panelNavigation
+                    onHintChanged: function(description) { root.hintDescription = description }
                 }
             }
         }

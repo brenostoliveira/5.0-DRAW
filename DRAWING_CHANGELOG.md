@@ -51,7 +51,7 @@ No additional source files.
 | File | Locations | Reason |
 | --- | --- | --- |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 31–39 | Adds the geometric tool icons. |
-| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 87–99 | Exposes the additional tools with extractable English labels; relocated from the overlay in R7. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 99–111 | Exposes the additional tools with extractable English labels; relocated from the overlay in R7. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.h` | 306 | Declares the shared path-update helper. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 803, 1593–1611, 1755–1870 | Constructs the supported shapes and preserves filled-arrow appearance during preview and SVG serialization. |
 
@@ -85,7 +85,7 @@ Activating drawing mode ends musical note entry and element editing and clears t
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `DRAWING_CHANGELOG.md` | 1–333 | Records feature revisions, changed-file locations, reasons and validation status. |
+| `DRAWING_CHANGELOG.md` | 1–368 | Records feature revisions, changed-file locations, reasons and validation status. |
 
 ### Files modified
 
@@ -254,7 +254,7 @@ Bézier, painting/gradients, path repetition, nodes/anchors, eraser, text, group
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 1–216 | Defines the scrolling 17-group panel, themed controls, tool state, navigation, color preview, stroke-width control and visibility option. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 1–262 | Defines the scrolling 17-group panel, themed controls, tool state, navigation, color preview, stroke-width control and visibility option. |
 
 ### Files modified
 
@@ -282,15 +282,15 @@ Pencil and geometric-tool subpanels expose existing shared color and stroke-widt
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolSubpanel.qml` | 1–152 | Provides the contextual frame, title, independent pin, close action, scrollable content, tool activation and live controls. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolSubpanel.qml` | 1–205 | Provides the contextual frame, title, independent pin, close action, scrollable content, tool activation and live controls. |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingSubpanels.qml` | 1–133 | Owns open subpanels, preserves pinned and confirmation-pending panels, and chooses bounded positions with minimal overlap among candidates. |
-| `src/notationscene/qml/MuseScore/NotationScene/DrawingStyleControls.qml` | 1–76 | Shares the existing drawing color and stroke-width controls with immediate preview updates. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingStyleControls.qml` | 1–124 | Shares the existing drawing color and stroke-width controls with immediate preview updates. |
 
 ### Files modified
 
 | File | Locations | Reason |
 | --- | --- | --- |
-| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 32, 139–158, 181–184 | Emits contextual-panel requests from available tools and relocates color/width controls into the colors subpanel. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 32, 151–170, 192–195 | Emits contextual-panel requests from available tools and relocates color/width controls into the colors subpanel. |
 | `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 55–65 | Hosts contextual panels separately from the main dock and exposes the panel-opening entry point. |
 | `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 310 | Connects main-panel requests to the active notation view's subpanel host. |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 52 | Adds the themed vector pin icon. |
@@ -316,6 +316,39 @@ No additional source files.
 | `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 118–130, 284–288 | Replaces the unavailable page-method call with the dock's exposed operations and reapplies visibility after initialization. |
 | `DRAWING_CHANGELOG.md` | R7/R8 source references, R9 and validation status | Records the confirmed runtime cause, correction, current source locations and verification limits. |
 
+## 5.0-DRAW-R10 — Consistent controls, passive hints and right-side docking
+
+### Added and modified functionality
+
+Uses the application's themed tooltip, button, slider, dropdown, checkbox and incremental numeric-field components. Contextual titles use the standard bold font, and action selection and disabled states retain native styling. Descriptions are translated English strings. Existing undo/redo shortcuts come from the action model; tools without assigned shortcuts do not advertise invented bindings or capture typed letters.
+
+Drawing controls display a name and short description on hover. Tooltip windows are created lazily and marked transparent to pointer input and unable to accept focus. Hover observation does not grab presses or drags, and hints close during pointer interaction. Disabled tool entries retain informative hints while the native action button remains disabled. The tooltip uses no outside-click dismissal policy that could interfere with the underlying setting.
+
+The main panel reserves a description area, reducing it only when the panel itself becomes shorter. Contextual subpanels reserve a fixed-height description area and a consistent header height. Hover changes do not resize these regions. Long descriptions wrap and elide inside the reserved bounds; long panel content retains scrolling.
+
+Stroke width now has a native numeric field alongside its slider. Both use the existing shared drawing-width setting, keep its existing 0.5–12 control range and update the preview immediately. The numeric field uses the application's locale-aware input and validation behavior.
+
+The main panel's default dock location is now the right side. Its dock identity changes so the previous left-side layout entry is not restored for this panel. Other panels keep their existing layout, and the drawing panel can still be moved using the native docking system.
+
+### Files added
+
+| File | Added lines | Reason |
+| --- | --- | --- |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingControlHint.qml` | 1–86 | Provides delayed native-themed hints, passive hover handling, pointer-transparent windows and interaction dismissal. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolButton.qml` | 1–59 | Wraps the native action button so unavailable tools can show descriptions without enabling their actions. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolInfo.qml` | 1–26 | Provides shared extractable tool descriptions for the main panel and contextual subpanels. |
+
+### Files modified
+
+| File | Locations | Reason |
+| --- | --- | --- |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingStyleControls.qml` | 27, 46–66, 74–124 | Adds color/width descriptions, interaction-aware hints and a synchronized numeric width field. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 37–39, 58–74, 151–202, 214–261 | Adds shared help text, passive tool hints, action-model shortcut hints and a description area that does not resize on hover. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolSubpanel.qml` | 30–31, 69–141, 154–201 | Standardizes header sizing and typography and adds pin, close and activation descriptions plus reserved help space. |
+| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 283, 296 | Opens new drawing-panel layouts on the right and avoids restoring the previous left-side panel entry. |
+| `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 175–177 | Registers the hint, button and shared-description components. |
+| `DRAWING_CHANGELOG.md` | refreshed R2/R7/R8 source locations, R10 and validation status | Documents visual behavior, layout migration, file changes and validation limits. |
+
 ## Validation status
 
 - The Windows development build completed with Qt 6.11.2, MSVC 2022 and the RelWithDebInfo configuration before R4.
@@ -329,5 +362,7 @@ No additional source files.
 - Portable artifact identity through R8: the installed application executable has SHA256 `D8D2E1A8F12B63ED522DAD9ED1C7C24CC1D594E1B385F9D3D3B8FFCAA32CA8FA`. Required launcher, Qt runtime and platform-plugin files were confirmed present.
 - Runtime observation after the R8 build confirmed that the main drawing panel did not open. The application log identifies a QML call to an unavailable page method; R9 corrects that call. R9 compiled, installed and completed Qt deployment and PortableApps packaging successfully. The contributor confirmed that the main drawing panel opens when drawing mode is activated. This confirmation covers panel opening; the remaining panel and drawing interactions are not yet verified.
 - Portable artifact identity through R9: the installed application executable has SHA256 `77D2FF3E550F54D2AC5559641B32881824DA8CF274819DA0FB884B198433D986`. Required launcher, Qt runtime and platform-plugin files were confirmed present.
+- R10 received source/API and whitespace inspection and completed portable compilation, installation, Qt deployment and launcher generation successfully. The contributor confirmed that the main panel opens correctly and reported partial tool functionality with scaling problems. The affected tools and reproduction conditions have not yet been isolated; scaling corrections are deferred to a later revision. Tooltip pass-through, numeric editing, stable layouts and workspace restoration still require dedicated runtime verification.
+- Portable artifact identity through R10: the installed application executable has SHA256 `A7309017397D7278140D88C33DEC2DAD5F99F0F5E626A0DEDC5B632072146430`. Required launcher, Qt runtime and platform-plugin files were confirmed present.
 - Automated tests were not executed. Musical editing, drawing interaction, persistence and portable runtime behavior still require application verification.
 - Source labels are in English and use translation extraction. Translation catalogs are unchanged.

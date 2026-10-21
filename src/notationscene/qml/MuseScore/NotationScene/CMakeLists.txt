@@ -172,6 +172,9 @@ qt_add_qml_module(notationscene_qml
         DrawingStyleControls.qml
         DrawingToolSubpanel.qml
         DrawingSubpanels.qml
+        DrawingControlHint.qml
+        DrawingToolButton.qml
+        DrawingToolInfo.qml
         EditGridSizeDialog.qml
         EditPercussionShortcutDialog.qml
         elementpopups/CapoPopup.qml

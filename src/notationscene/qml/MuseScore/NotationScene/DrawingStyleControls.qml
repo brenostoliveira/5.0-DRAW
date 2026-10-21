@@ -23,6 +23,7 @@ ColumnLayout {
     id: root
     required property var paintView
     required property NavigationPanel navigationPanel
+    signal hintChanged(string description)
     spacing: 8
 
     StyledTextLabel {
@@ -42,6 +43,7 @@ ColumnLayout {
             radius: 2
         }
         StyledDropdown {
+            id: colorControl
             Layout.fillWidth: true
             model: [
                 { text: qsTrc("notation", "Black"), value: "#1f1f1f" },
@@ -54,6 +56,13 @@ ColumnLayout {
             navigation.order: 3
             navigation.accessible.name: qsTrc("notation", "Drawing color")
             onActivated: function(index, value) { root.paintView.drawingColor = value }
+            DrawingControlHint {
+                control: colorControl
+                title: qsTrc("notation", "Drawing color")
+                description: qsTrc("notation", "Choose the color used for drawing strokes and previews.")
+                interacting: colorControl.isOpened
+                onHintChanged: function(description) { root.hintChanged(description) }
+            }
         }
     }
 
@@ -62,15 +71,54 @@ ColumnLayout {
         text: qsTrc("notation", "Stroke width")
         horizontalAlignment: Text.AlignLeft
     }
-    StyledSlider {
+    RowLayout {
         Layout.fillWidth: true
-        from: 0.5
-        to: 12
-        stepSize: 0.5
-        value: root.paintView ? root.paintView.drawingWidth : 1.5
-        navigation.panel: root.navigationPanel
-        navigation.order: 4
-        navigation.accessible.name: qsTrc("notation", "Stroke width")
-        onMoved: root.paintView.drawingWidth = value
+        spacing: 8
+        StyledSlider {
+            id: widthSlider
+            Layout.fillWidth: true
+            Layout.minimumWidth: 40
+            from: 0.5
+            to: 12
+            stepSize: 0.5
+            value: root.paintView ? root.paintView.drawingWidth : 1.5
+            navigation.panel: root.navigationPanel
+            navigation.order: 4
+            navigation.accessible.name: qsTrc("notation", "Stroke width")
+            onMoved: root.paintView.drawingWidth = value
+            DrawingControlHint {
+                control: widthSlider
+                title: qsTrc("notation", "Stroke width")
+                description: qsTrc("notation", "Drag to adjust stroke width with an immediate preview.")
+                interacting: widthSlider.pressed
+                onHintChanged: function(description) { root.hintChanged(description) }
+            }
+        }
+        IncrementalPropertyControl {
+            id: widthNumber
+            Layout.preferredWidth: 76
+            Layout.minimumWidth: 76
+            Layout.maximumWidth: 76
+            currentValue: root.paintView ? root.paintView.drawingWidth : 1.5
+            minValue: 0.5
+            maxValue: 12
+            step: 0.5
+            decimals: 2
+            navigation.panel: root.navigationPanel
+            navigation.order: 5
+            navigation.accessible.name: qsTrc("notation", "Stroke width value")
+            onValueEdited: function(value) {
+                if (Number.isFinite(value) && value >= minValue && value <= maxValue) {
+                    root.paintView.drawingWidth = value
+                }
+            }
+            DrawingControlHint {
+                control: widthNumber
+                title: qsTrc("notation", "Stroke width value")
+                description: qsTrc("notation", "Enter a width from 0.5 to 12, or use the increment buttons.")
+                interacting: widthNumber.activeFocus
+                onHintChanged: function(description) { root.hintChanged(description) }
+            }
+        }
     }
 }

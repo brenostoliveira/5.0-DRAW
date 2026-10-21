@@ -34,6 +34,10 @@ Item {
     readonly property bool canDraw: Boolean(paintView) && paintView.drawingMode
                                    && !paintView.readOnly && !paintView.publishMode
 
+    property string hintDescription: ""
+    readonly property real descriptionHeight: Math.max(0, Math.min(96, height - 120))
+    DrawingToolInfo { id: toolInfo }
+
     implicitWidth: 168
 
     NavigationPanel {
@@ -52,12 +56,20 @@ Item {
         spacing: 8
 
         CheckBox {
+            id: keepVisibleControl
             Layout.fillWidth: true
             text: qsTrc("notation", "Keep visible")
             checked: root.keepVisible
             navigation.panel: toolsNavigation
             navigation.order: 0
             onClicked: root.keepVisibleRequested(!checked)
+            DrawingControlHint {
+                control: keepVisibleControl
+                title: qsTrc("notation", "Keep visible")
+                description: qsTrc("notation", "Keep the main panel open when drawing mode is turned off.")
+                interacting: keepVisibleControl.pressed
+                onHintChanged: function(description) { root.hintDescription = description }
+            }
         }
 
         SeparatorLine { Layout.fillWidth: true }
@@ -136,14 +148,14 @@ Item {
                             wrapMode: Text.WordWrap
                         }
 
-                        FlatButton {
+                        DrawingToolButton {
                             visible: groupDelegate.modelData.key === "colors"
                             width: 38
                             height: 34
-                            minWidth: 0
-                            margins: 0
-                            enabled: root.canDraw
+                            actionEnabled: root.canDraw
                             toolTipTitle: qsTrc("notation", "Drawing colors and stroke")
+                            toolTipDescription: toolInfo.description("colors")
+                            onHintChanged: function(description) { root.hintDescription = description }
                             navigation.panel: toolsNavigation
                             navigation.order: 1
                             contentItem: Rectangle {
@@ -162,19 +174,18 @@ Item {
                             spacing: 6
                             Repeater {
                                 model: groupDelegate.modelData.tools
-                                delegate: FlatButton {
+                                delegate: DrawingToolButton {
                                     id: toolButton
                                     required property var modelData
                                     required property int index
                                     width: 38
                                     height: 34
-                                    minWidth: 0
-                                    margins: 0
-                                    enabled: root.canDraw && modelData.available
+                                    actionEnabled: root.canDraw && modelData.available
                                     accentButton: modelData.available && Boolean(root.paintView)
                                                   && root.paintView.drawingTool === modelData.tool
                                     toolTipTitle: modelData.title
-                                    toolTipDescription: modelData.available ? "" : qsTrc("notation", "Not available yet")
+                                    toolTipDescription: modelData.available ? toolInfo.description(modelData.tool) : qsTrc("notation", "This tool is not available yet.")
+                                    onHintChanged: function(description) { root.hintDescription = description }
                                     accessible.selected: accentButton
                                     navigation.panel: toolsNavigation
                                     navigation.order: (groupDelegate.index + 1) * 100 + index
@@ -200,10 +211,33 @@ Item {
                             active: groupDelegate.modelData.key === "history"
                             visible: active
                             sourceComponent: UndoRedoToolBar {
+                                id: historyToolbar
                                 enabled: root.canDraw
                                 navigationPanel.name: "DrawingUndoRedo"
                                 navigationPanel.section: root.navigationSection
                                 navigationPanel.order: root.navigationOrderStart + 1
+                                sourceComponentCallback: function(type) {
+                                    return type === ToolBarItemType.ACTION ? historyControl : null
+                                }
+                                Component {
+                                    id: historyControl
+                                    StyledToolBarItem {
+                                        id: historyButton
+                                        width: 30
+                                        height: 30
+                                        navigation.panel: historyToolbar.navigationPanel
+                                        navigation.order: historyButton.parent ? historyButton.parent.itemIndex : 0
+                                        toolTipShowLocked: true
+                                        DrawingControlHint {
+                                            control: historyButton
+                                            title: historyButton.toolTipTitle
+                                            description: historyButton.toolTipDescription || qsTrc("notation", "Undo or redo the most recent score edit.")
+                                            shortcut: historyButton.toolTipShortcut
+                                            interacting: historyButton.mouseArea.pressed
+                                            onHintChanged: function(description) { root.hintDescription = description }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -211,6 +245,18 @@ Item {
                     }
                 }
             }
+        }
+        SeparatorLine { Layout.fillWidth: true }
+        StyledTextLabel {
+            Layout.fillWidth: true
+            Layout.minimumHeight: root.descriptionHeight
+            Layout.preferredHeight: root.descriptionHeight
+            Layout.maximumHeight: root.descriptionHeight
+            text: root.hintDescription || toolInfo.description(root.paintView ? root.paintView.drawingTool : "select")
+            horizontalAlignment: Text.AlignLeft
+            verticalAlignment: Text.AlignTop
+            wrapMode: Text.WordWrap
+            maximumLineCount: 5
         }
     }
 }

@@ -280,7 +280,7 @@ DockPage {
     panels: [
         DockPanel {
             id: drawingPanel
-            objectName: "drawingToolsPanel"
+            objectName: "drawingToolsPanelRight"
             onInitedChanged: {
                 if (inited) {
                     Qt.callLater(root.updateDrawingPanelVisibility)
@@ -293,7 +293,7 @@ DockPage {
             maximumWidth: 240
             minimumHeight: 100
             maximumHeight: root.panelMaxDimension
-            location: Location.Left
+            location: Location.Right
             groupName: "DRAWING_TOOLS"
             navigationSection: root.navigationPanelSec(drawingPanel.location)
             dropDestinations: [
