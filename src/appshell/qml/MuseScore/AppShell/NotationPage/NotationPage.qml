@@ -88,6 +88,7 @@ DockPage {
 
     onInited: {
         Qt.callLater(pageModel.init)
+        Qt.callLater(root.updateDrawingPanelVisibility)
     }
 
     readonly property int verticalPanelDefaultWidth: 300
@@ -112,6 +113,22 @@ DockPage {
     ]
 
     property var notationView: null
+    property bool keepDrawingPanelVisible: false
+
+    function updateDrawingPanelVisibility() {
+        if (drawingPanel.inited) {
+            root.setDockOpen(drawingPanel.objectName, root.keepDrawingPanelVisible
+                             || (Boolean(root.notationView) && root.notationView.drawingMode))
+        }
+    }
+
+    onNotationViewChanged: Qt.callLater(root.updateDrawingPanelVisibility)
+    onKeepDrawingPanelVisibleChanged: root.updateDrawingPanelVisibility()
+
+    Connections {
+        target: root.notationView
+        function onDrawingModeChanged() { root.updateDrawingPanelVisibility() }
+    }
 
     mainToolBars: [
         DockToolBar {
@@ -254,6 +271,33 @@ DockPage {
     ]
 
     panels: [
+        DockPanel {
+            id: drawingPanel
+            objectName: "drawingToolsPanel"
+            title: qsTrc("notation", "Drawing tools")
+            visible: false
+            width: 168
+            minimumWidth: 160
+            maximumWidth: 240
+            minimumHeight: 100
+            maximumHeight: root.panelMaxDimension
+            location: Location.Left
+            groupName: "DRAWING_TOOLS"
+            navigationSection: root.navigationPanelSec(drawingPanel.location)
+            dropDestinations: [
+                { "dock": root.centralDock, "dropLocation": Location.Left, "dropDistance": 168 },
+                { "dock": root.centralDock, "dropLocation": Location.Right, "dropDistance": 168 }
+            ]
+
+            DrawingToolsPanel {
+                paintView: root.notationView
+                keepVisible: root.keepDrawingPanelVisible
+                navigationSection: drawingPanel.navigationSection
+                navigationOrderStart: drawingPanel.contentNavigationPanelOrderStart
+                onKeepVisibleRequested: function(keep) { root.keepDrawingPanelVisible = keep }
+                onSubpanelRequested: function(tool, title) { notationView.openDrawingSubpanel(tool, title) }
+            }
+        },
         DockPanel {
             id: palettesPanel
 

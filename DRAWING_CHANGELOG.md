@@ -12,7 +12,7 @@ Adds a drawing-mode entry in the notation interface and the View menu. The palet
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 1–55 | Defines vector icons for the drawing palette, including the geometric additions in R2. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 1–68 | Defines vector icons for the drawing palette, including the geometric additions in R2. |
 
 ### Files modified
 
@@ -32,7 +32,7 @@ Adds a drawing-mode entry in the notation interface and the View menu. The palet
 | `src/notationscene/internal/notationcommandsstate.h` | 33, 44 | Provides access to scene configuration for the action's checked state. |
 | `src/notationscene/internal/notationcommandsstate.cpp` | 370–373, 518–521 | Synchronizes the checked state shown by interface entry points. |
 | `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 170 | Registers the drawing icon component in the QML module. |
-| `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 153–280 | Adds the palette, tool selection, color and stroke-width controls. |
+| `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | previous 153–280; removed in R7 | Originally added the overlay palette. R7 relocates its controls into the docked panel. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.h` | 26–28, 75–78, 173–181, 206–208, 303–308, 362–369 | Declares drawing properties, signals, pointer handlers and temporary path state. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 28–35, 154–174, 800–807, 1565–1887, 2118–2120, 2141–2147 | Implements mode synchronization, previews, pointer gestures, SVG serialization and score insertion. |
 
@@ -51,7 +51,7 @@ No additional source files.
 | File | Locations | Reason |
 | --- | --- | --- |
 | `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 31–39 | Adds the geometric tool icons. |
-| `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 199–207 | Exposes the additional tools with extractable English labels. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 87–99 | Exposes the additional tools with extractable English labels; relocated from the overlay in R7. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.h` | 306 | Declares the shared path-update helper. |
 | `src/notationscene/qml/MuseScore/NotationScene/abstractnotationpaintview.cpp` | 803, 1593–1611, 1755–1870 | Constructs the supported shapes and preserves filled-arrow appearance during preview and SVG serialization. |
 
@@ -85,7 +85,7 @@ Activating drawing mode ends musical note entry and element editing and clears t
 
 | File | Added lines | Reason |
 | --- | --- | --- |
-| `DRAWING_CHANGELOG.md` | 1–247 | Records feature revisions, changed-file locations, reasons and validation status. |
+| `DRAWING_CHANGELOG.md` | 1–312 | Records feature revisions, changed-file locations, reasons and validation status. |
 
 ### Files modified
 
@@ -236,12 +236,77 @@ The following changes belong to official main. Locations are from the upstream i
 | `src/stubs/playback/playbackcontrollerstub.cpp` | Modified | 56–65 | Integrates upstream: remove context module. step 1. |
 | `src/stubs/playback/playbackcontrollerstub.h` | Modified | 40–42 | Integrates upstream: remove context module. step 1. |
 
+## 5.0-DRAW-R7 — Docked main drawing tools panel
+
+### Added functionality
+
+Replaces the score-overlay palette with a narrow native dock panel. The panel can be moved to either side of the score or floated through the existing docking system. Group headings, vector icons, separators, native themed buttons and the highlighted current tool organize the drawing interface. Vertical scrolling keeps the controls reachable in short windows.
+
+Groups follow the requested order: colors; selection; pencil; Bézier; shapes; painting/gradients; repeat along path; nodes/anchors; eraser; text; grouping/fusion; objects/layers; characters; import/export; undo/redo; delete; anchor grid.
+
+The Keep visible option retains the panel when drawing mode is disabled while the notation page remains active. Drawing controls remain disabled outside drawing mode, preserving musical interaction. Unpinning outside drawing mode hides the panel. The option is held by the notation page rather than the panel content, so opening and closing the dock does not reset it.
+
+The existing selection, pencil, geometric tools, drawing colors and stroke width are connected to the score view. Color and width changes retain their immediate preview behavior. The undo/redo group reuses the official score-history toolbar. Keyboard navigation uses the application's navigation controls, and tool tips use the native tooltip service without adding an input overlay or letter shortcuts.
+
+Bézier, painting/gradients, path repetition, nodes/anchors, eraser, text, grouping/fusion, objects/layers, characters, drawing import/export, drawing deletion and anchor-grid groups have disabled entries in this revision. Their editing operations are not implemented by this panel-structure increment. Disabled controls do not invoke musical actions or claim a tool is active.
+
+### Files added
+
+| File | Added lines | Reason |
+| --- | --- | --- |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 1–216 | Defines the scrolling 17-group panel, themed controls, tool state, navigation, color preview, stroke-width control and visibility option. |
+
+### Files modified
+
+| File | Locations | Reason |
+| --- | --- | --- |
+| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 91, 116–131, 273–299 | Registers the narrow native dock, its side-drop destinations and visibility policy, and supplies the active score view. |
+| `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | removed previous 153–280; current 165 | Removes the fixed overlay so drawing controls belong to the docked panel and no longer cover the score. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 40–51 | Adds theme-colored vector icons for the additional panel groups. |
+| `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 171 | Registers the new panel with the notation-scene QML module. |
+| `DRAWING_CHANGELOG.md` | R1/R2 source references, R7 and validation status | Records this panel increment, file locations, reasons and the limits of the available group operations. |
+
+## 5.0-DRAW-R8 — Contextual tool subpanels and independent pinning
+
+### Added functionality
+
+Opens a contextual subpanel when an available drawing tool or the colors control is chosen from the main panel. Each subpanel has an English title, a pin button in the upper-right header, a close button and scrolling content. The pin starts off. Pinned subpanels remain open when another tool panel is opened; an existing panel is reused instead of duplicated. Closing a subpanel does not change the active tool or main-panel visibility option.
+
+New panels are placed within the score-view area, which stays inside the application window and excludes docked side panels. Placement considers space on both sides and above/below existing panels, minimizes overlap among the candidate positions, and recomputes positions when the available area changes. When there is insufficient space for a non-overlapping arrangement, overlap is reduced rather than allowing panels outside the available bounds. The content scrolls when the panel height is constrained.
+
+Subpanel pin state is independent of the main Keep visible setting. Leaving drawing mode hides contextual panels without destroying their state; returning reveals them. Clicking outside does not dismiss them. A confirmation-pending state prevents automatic replacement on a tool change; this increment does not introduce a new Confirm/Cancel editing session.
+
+Pencil and geometric-tool subpanels expose existing shared color and stroke-width settings and a tool activation control. These settings apply to the current drawing style, rather than introducing separate saved styles for each tool. Selection uses its existing tool action and selection hint. Unimplemented tool groups remain unavailable. No new editing operations or global letter shortcuts are added.
+
+### Files added
+
+| File | Added lines | Reason |
+| --- | --- | --- |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolSubpanel.qml` | 1–152 | Provides the contextual frame, title, independent pin, close action, scrollable content, tool activation and live controls. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingSubpanels.qml` | 1–133 | Owns open subpanels, preserves pinned and confirmation-pending panels, and chooses bounded positions with minimal overlap among candidates. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingStyleControls.qml` | 1–76 | Shares the existing drawing color and stroke-width controls with immediate preview updates. |
+
+### Files modified
+
+| File | Locations | Reason |
+| --- | --- | --- |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolsPanel.qml` | 32, 139–158, 181–184 | Emits contextual-panel requests from available tools and relocates color/width controls into the colors subpanel. |
+| `src/notationscene/qml/MuseScore/NotationScene/NotationView.qml` | 55–65 | Hosts contextual panels separately from the main dock and exposes the panel-opening entry point. |
+| `src/appshell/qml/MuseScore/AppShell/NotationPage/NotationPage.qml` | 298 | Connects main-panel requests to the active notation view's subpanel host. |
+| `src/notationscene/qml/MuseScore/NotationScene/DrawingToolIcon.qml` | 52 | Adds the themed vector pin icon. |
+| `src/notationscene/qml/MuseScore/NotationScene/CMakeLists.txt` | 172–174 | Registers the contextual panel, host and shared style controls in the QML module. |
+| `DRAWING_CHANGELOG.md` | refreshed R1/R2/R7 references, R8 and validation status | Documents contextual behavior, changed locations, reasons and validation limits. |
+
 ## Validation status
 
 - The Windows development build completed with Qt 6.11.2, MSVC 2022 and the RelWithDebInfo configuration before R4.
 - Portable compilation and Qt dependency deployment completed successfully through R3. The package includes the PortableApps launcher, Qt runtime libraries and Windows platform plugin. Portable-mode headers were checked.
-- R4 and R5 received source review, C++ formatting and whitespace inspection. They have not been compiled or checked in the running application.
-- R6 received conflict and source-diff inspection. Both submodules match the official main references. The merged source has not been compiled or checked in the running application.
-- The subsequent R4/R5 portable update attempt stopped during configuration before compilation or deployment; it did not replace the previously successful R3 package.
+- R4 and R5 received source review, C++ formatting and whitespace inspection and are included in the successful portable build through R8. They have not been checked in the running application.
+- R6 received conflict and source-diff inspection. Both submodules match the official main references. The merged source is included in the successful portable build through R8; runtime verification remains outstanding.
+- The subsequent R4/R5 portable update attempt stopped during configuration because the local build helper treated a native warning as a terminating PowerShell error; it did not replace the previously successful R3 package.
+- R7 compiled successfully as part of the portable build through R8; it has not been launched or exercised in the application. Docking, scrolling, keyboard navigation and theme rendering require runtime verification.
+- R8 compiled successfully and was installed and deployed with the Qt dependencies and official PortableApps launcher. It has not been launched or exercised in the application. Pinning, replacement, placement under window resizing, scrolling, focus and live style synchronization require runtime verification.
+- The local build helper now records native warning output without stopping the pipeline and checks each native process exit status. This orchestration correction is outside the repository; official build scripts are unchanged. The R8 build, installation and Qt deployment completed successfully. A final artifact-hash error was repaired using the .NET SHA256 implementation; the installed executable hash matches the compiled executable. The helper correction remains outside the repository.
+- Portable artifact identity through R8: the installed application executable has SHA256 `D8D2E1A8F12B63ED522DAD9ED1C7C24CC1D594E1B385F9D3D3B8FFCAA32CA8FA`. Required launcher, Qt runtime and platform-plugin files were confirmed present.
 - Automated tests were not executed. Musical editing, drawing interaction, persistence and portable runtime behavior still require application verification.
 - Source labels are in English and use translation extraction. Translation catalogs are unchanged.
