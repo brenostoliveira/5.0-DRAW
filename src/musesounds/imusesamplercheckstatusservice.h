@@ -21,20 +21,24 @@
  */
 #pragma once
 
-#include "async/promise.h"
-#include "types/ret.h"
+#include "types/retval.h"
 
 #include "modularity/imoduleinterface.h"
 
+#include "async/promise.h"
+
 namespace mu::musesounds {
-class IMuseSamplerCheckUpdateScenario : MODULE_CONTEXT_INTERFACE
+class IMuseSamplerCheckStatusService : MODULE_CONTEXT_INTERFACE
 {
-    INTERFACE_ID(IMuseSamplerCheckUpdateScenario)
+    INTERFACE_ID(IMuseSamplerCheckStatusService)
 
 public:
-    virtual ~IMuseSamplerCheckUpdateScenario() = default;
+    virtual ~IMuseSamplerCheckStatusService() = default;
 
-    virtual bool alreadyChecked() const = 0;
-    virtual void checkAndShowUpdateIfNeed() = 0;
+    virtual bool libInitFailed() const = 0;
+    virtual bool canCheckForUpdate() const = 0;
+    virtual bool incompatibleLocalVersion() const = 0;
+
+    virtual muse::async::Promise<muse::RetVal<bool> > checkForUpdate() = 0;
 };
 }

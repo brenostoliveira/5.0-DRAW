@@ -20,15 +20,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "musesamplercheckstatusscenariostub.h"
 
-#include "musesounds/imusesamplercheckupdatescenario.h"
+using namespace mu::musesounds;
 
-namespace mu::musesounds {
-class MuseSamplerCheckUpdateScenarioStub : public IMuseSamplerCheckUpdateScenario
+bool MuseSamplerCheckStatusScenarioStub::alreadyChecked() const
 {
-public:
-    bool alreadyChecked() const override;
-    void checkAndShowUpdateIfNeed() override;
-};
+    return false;
+}
+
+void MuseSamplerCheckStatusScenarioStub::checkAndShowStatusIfNeed()
+{
 }

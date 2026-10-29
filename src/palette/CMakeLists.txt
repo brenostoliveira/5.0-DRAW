@@ -20,10 +20,6 @@
 
 muse_create_module(palette)
 
-if(WIN_PORTABLE)
-    target_compile_definitions(palette PRIVATE WIN_PORTABLE)
-endif()
-
 target_sources(palette PRIVATE
     palettemodule.cpp
     palettemodule.h

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-Studio-CLA-applies
+ * MuseScore-CLA-applies
  *
- * MuseScore Studio
+ * MuseScore
  * Music Composition & Notation
  *
- * Copyright (C) 2025 MuseScore Limited and others
+ * Copyright (C) 2026 MuseScore Limited and others
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,15 +20,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "musesamplercheckupdatescenariostub.h"
+#pragma once
 
-using namespace mu::musesounds;
+#include "io/path.h"
 
-bool MuseSamplerCheckUpdateScenarioStub::alreadyChecked() const
+namespace muse::vst {
+//! Same as VST3::Hosting::Module::getModulePaths() from the VST3 SDK (module_mac.mm),
+//! but each directory is scanned only once, so symlink loops can't cause infinite recursion
+class MacOSVstModulePaths
 {
-    return false;
-}
-
-void MuseSamplerCheckUpdateScenarioStub::checkAndShowUpdateIfNeed()
-{
+public:
+    static io::paths_t getModulePaths();
+};
 }

@@ -1,11 +1,11 @@
 /*
  * SPDX-License-Identifier: GPL-3.0-only
- * MuseScore-CLA-applies
+ * MuseScore-Studio-CLA-applies
  *
- * MuseScore
+ * MuseScore Studio
  * Music Composition & Notation
  *
- * Copyright (C) 2025 MuseScore Limited and others
+ * Copyright (C) 2026 MuseScore Limited and others
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -20,23 +20,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "musesamplercheckupdateservicestub.h"
+#pragma once
 
-using namespace mu::musesounds;
+#include <gmock/gmock.h>
 
-bool MuseSamplerCheckUpdateServiceStub::canCheckForUpdate() const
+#include "musesounds/imusesamplercheckstatusservice.h"
+
+namespace mu::musesounds {
+class MuseSamplerCheckStatusServiceMock : public IMuseSamplerCheckStatusService
 {
-    return false;
-}
+public:
+    MOCK_METHOD(bool, libInitFailed, (), (const, override));
+    MOCK_METHOD(bool, canCheckForUpdate, (), (const, override));
+    MOCK_METHOD(bool, incompatibleLocalVersion, (), (const, override));
 
-bool MuseSamplerCheckUpdateServiceStub::incompatibleLocalVersion() const
-{
-    return false;
-}
-
-muse::async::Promise<muse::RetVal<bool> > MuseSamplerCheckUpdateServiceStub::checkForUpdate()
-{
-    return muse::async::Promise<muse::RetVal<bool> >([](auto /*resolve*/, auto reject) {
-        return reject(int(muse::Ret::Code::UnknownError), "stub");
-    });
+    MOCK_METHOD(muse::async::Promise<muse::RetVal<bool> >, checkForUpdate, (), (override));
+};
 }

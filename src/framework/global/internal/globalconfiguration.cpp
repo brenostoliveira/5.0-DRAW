@@ -118,11 +118,7 @@ io::path_t GlobalConfiguration::userBackupPath() const
 
 io::path_t GlobalConfiguration::userDataPath() const
 {
-#ifdef WIN_PORTABLE
-    static io::path_t p = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../../Data/documents");
-#else
     static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + QCoreApplication::applicationName();
-#endif
     return p;
 }
 

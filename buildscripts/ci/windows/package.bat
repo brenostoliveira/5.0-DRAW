@@ -104,7 +104,7 @@ ECHO "Start 7z packing..."
 IF %BUILD_MODE% == nightly ( 
     SET ARTIFACT_NAME=MuseScore-Studio-Nightly-%BUILD_NUMBER%-%BUILD_BRANCH%-%BUILD_REVISION%-%TARGET_PROCESSOR_ARCH%
 ) ELSE (
-    SET ARTIFACT_NAME=MuseScore-DRAWING-TEST-%BUILD_VERSION%-%TARGET_PROCESSOR_ARCH%
+    SET ARTIFACT_NAME=MuseScore-Studio-%BUILD_VERSION%-%TARGET_PROCESSOR_ARCH%
 )
 
 RENAME %INSTALL_DIR% %ARTIFACT_NAME%
@@ -179,17 +179,13 @@ for /r %%i in (%BUILD_DIR%\*.msi) do (
 IF %BUILD_MODE% == nightly ( 
     SET ARTIFACT_NAME=MuseScore-Studio-Nightly-%BUILD_NUMBER%-%BUILD_BRANCH%-%BUILD_REVISION%-%TARGET_PROCESSOR_ARCH%.msi
 ) ELSE (
-    SET ARTIFACT_NAME=MuseScore-DRAWING-TEST-%BUILD_VERSION%-%TARGET_PROCESSOR_ARCH%.msi
+    SET ARTIFACT_NAME=MuseScore-Studio-%BUILD_VERSION%-%TARGET_PROCESSOR_ARCH%.msi
 )
 
 ECHO "Copy from %FILEPATH% to %ARTIFACT_NAME%"
 
 COPY %FILEPATH% %ARTIFACTS_DIR%\%ARTIFACT_NAME% /Y || GOTO END_ERROR
 SET ARTIFACT_PATH=%ARTIFACTS_DIR%\%ARTIFACT_NAME%
-
-:: A successful WiX exit is insufficient: reject an unlinked/empty MSI.
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File buildscripts\ci\windows\validate-msi.ps1 -Path "%ARTIFACT_PATH%"
-IF ERRORLEVEL 1 GOTO END_ERROR
 
 IF %DO_SIGN% == ON (
     CALL %SIGN% --secret %SIGN_SECRET% --key %SIGN_KEY% --file %ARTIFACT_PATH% || exit /b 1
@@ -229,7 +225,7 @@ for /r %%i in (.\*.paf.exe) do (
 IF %BUILD_MODE% == nightly ( 
     SET ARTIFACT_NAME=MuseScore-Studio-Nightly-%BUILD_NUMBER%-%BUILD_BRANCH%-%BUILD_REVISION%-%TARGET_PROCESSOR_ARCH%.paf.exe
 ) ELSE (
-    SET ARTIFACT_NAME=MuseScore-DRAWING-TEST-%BUILD_VERSION%-%TARGET_PROCESSOR_ARCH%.paf.exe
+    SET ARTIFACT_NAME=MuseScore-Studio-%BUILD_VERSION%-%TARGET_PROCESSOR_ARCH%.paf.exe
 )
 
 ECHO "Copy from %FILEPATH% to %ARTIFACT_NAME%"

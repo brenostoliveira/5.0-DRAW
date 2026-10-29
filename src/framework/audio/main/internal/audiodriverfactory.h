@@ -5,7 +5,7 @@
  * MuseScore
  * Music Composition & Notation
  *
- * Copyright (C) 2025 MuseScore Limited and others
+ * Copyright (C) 2026 MuseScore Limited and others
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 3 as
@@ -21,23 +21,13 @@
  */
 #pragma once
 
-#include "types/retval.h"
+#include "iaudiodriverfactory.h"
 
-#include "modularity/imoduleinterface.h"
-
-#include "async/promise.h"
-
-namespace mu::musesounds {
-class IMuseSamplerCheckUpdateService : MODULE_CONTEXT_INTERFACE
+namespace muse::audio {
+class AudioDriverFactory : public IAudioDriverFactory
 {
-    INTERFACE_ID(IMuseSamplerCheckUpdateService)
-
 public:
-    virtual ~IMuseSamplerCheckUpdateService() = default;
-
-    virtual bool canCheckForUpdate() const = 0;
-    virtual bool incompatibleLocalVersion() const = 0;
-
-    virtual muse::async::Promise<muse::RetVal<bool> > checkForUpdate() = 0;
+    std::vector<std::string> availableAudioDrivers() const override;
+    IAudioDriverPtr createDriver(const std::string& name) const override;
 };
 }
