@@ -42,6 +42,8 @@ static constexpr QRectF websiteRect(loadingScreenSize.width() - 48, loadingScree
 
 static const QColor versionNumberColor("#19F3FF");
 static constexpr qreal versionNumberSpacing = 5.0;
+// Independent edition update in São Paulo time (yyyyMMddHHmm).
+static const QString drawingUpdateTimestamp = QStringLiteral("202611061151");
 
 LoadingScreenView::LoadingScreenView(QWidget* parent)
     : QWidget(parent), muse::Contextable(muse::iocCtxForQWidget(this)),
@@ -92,5 +94,5 @@ void LoadingScreenView::draw(QPainter* painter)
                       Qt::AlignBottom | alignment | Qt::TextDontClip,
                       QStringLiteral("%1 \u2014 %2")
                       .arg(muse::qtrc("appshell", "Version %1").arg(application()->fullVersion().toString()))
-                      .arg(application()->revision()));
+                      .arg(drawingUpdateTimestamp));
 }
