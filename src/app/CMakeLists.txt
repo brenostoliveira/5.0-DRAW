@@ -33,15 +33,22 @@ if (OS_IS_WIN)
 
     include(GetCompilerInfo)
 
+    set(WINDOWS_ICON_FILES
+        ${PROJECT_SOURCE_DIR}/share/icons/AppIcon/MS4_AppIcon.ico
+        ${PROJECT_SOURCE_DIR}/share/icons/MsczIcon/MS4_MsczIcon.ico
+        ${PROJECT_SOURCE_DIR}/share/icons/MscxIcon/MS4_MscxIcon.ico
+    )
+
     if (CC_IS_MSVC)
         # MSVC recognizes a *.rc file and will invoke the resource compiler to link it
         set(WINDOWS_ICONS_RC ${PROJECT_SOURCE_DIR}/share/icons/windows_icons.rc)
+        set_property(SOURCE ${WINDOWS_ICONS_RC} APPEND PROPERTY OBJECT_DEPENDS ${WINDOWS_ICON_FILES})
     elseif(CC_IS_MINGW)
         set(WINDOWS_ICONS_RC ${PROJECT_BINARY_DIR}/windows_icons_rc.o)
         add_custom_command(
             OUTPUT ${PROJECT_BINARY_DIR}/windows_icons_rc.o
             COMMAND ${CMAKE_RC_COMPILER} -i windows_icons.rc -o ${PROJECT_BINARY_DIR}/windows_icons_rc.o
-            DEPENDS ${PROJECT_SOURCE_DIR}/share/icons/windows_icons.rc
+            DEPENDS ${PROJECT_SOURCE_DIR}/share/icons/windows_icons.rc ${WINDOWS_ICON_FILES}
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/share/icons
             )
         set_source_files_properties(${PROJECT_BINARY_DIR}/windows_icons_rc.o PROPERTIES generated true)
