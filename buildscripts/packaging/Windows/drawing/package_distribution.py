@@ -152,7 +152,7 @@ def main():
     element(shortcut_component, "Shortcut", Id="DrawingStartMenu", Name="MuseScore Drawing 4.7",
             Target="[DRAWING_INSTALL_ROOT]bin\\MuseScore4.exe", WorkingDirectory=identifier("D", "bin"), Icon="DrawingIcon")
     element(shortcut_component, "RemoveFolder", Id="RemoveDrawingMenu", On="uninstall")
-    element(shortcut_component, "RegistryValue", Root="HKLM", Key="Software\\BrenoOliveira\\MuseScoreDrawing4.7",
+    element(shortcut_component, "RegistryValue", Root="HKCU", Key="Software\\BrenoOliveira\\MuseScoreDrawing4.7",
             Name="Installed", Type="integer", Value="1", KeyPath="yes")
     element(feature, "ComponentRef", Id="DrawingShortcut")
 
@@ -176,8 +176,8 @@ def main():
     if not any(row[0] == "DRAWING_INSTALL_ROOT" and row[1] == "ProgramFiles64Folder"
                and row[2].split("|")[-1] == "MuseScore Drawing 4.7" for row in directory_rows):
         raise RuntimeError("Installer destination mismatch")
-    registry_rows = msi_rows(installer, "SELECT `Key` FROM `Registry`")
-    if any(row[0] != "Software\\BrenoOliveira\\MuseScoreDrawing4.7" for row in registry_rows):
+    registry_rows = msi_rows(installer, "SELECT `Root`, `Key` FROM `Registry`")
+    if any(row != ["1", "Software\\BrenoOliveira\\MuseScoreDrawing4.7"] for row in registry_rows):
         raise RuntimeError("Installer writes an unexpected registry key")
     upgrades = msi_rows(installer, "SELECT `UpgradeCode` FROM `Upgrade`")
     if not upgrades or any(row[0] != "{" + UPGRADE_CODE + "}" for row in upgrades):
