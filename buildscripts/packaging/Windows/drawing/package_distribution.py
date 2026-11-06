@@ -91,6 +91,8 @@ def main():
     source = Path(spec["snapshot"])
     wix = Path(spec["wix"])
     runtime_manifest = json.loads((artifact / "build-result.json").read_text(encoding="utf8"))
+    if runtime_manifest["revision"] != spec["revision"]:
+        raise RuntimeError("Runtime revision differs from the release specification")
     runtime_zip = artifact / "MuseScore-4.7.6-drawing-runtime.zip"
     if digest(runtime_zip) != runtime_manifest["archiveSha256"]:
         raise RuntimeError("Runtime ZIP checksum mismatch")
