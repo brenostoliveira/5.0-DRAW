@@ -133,6 +133,9 @@ bool SelectionFilter::canSelect(const EngravingItem* e) const
     }
 
     switch (e->type()) {
+    case ElementType::IMAGE:
+        // Drawing-editor images are not part of notation range selections.
+        return e->selectable();
     case ElementType::DYNAMIC:
         return isFiltered(ElementsSelectionFilterTypes::DYNAMIC);
     case ElementType::HAIRPIN:

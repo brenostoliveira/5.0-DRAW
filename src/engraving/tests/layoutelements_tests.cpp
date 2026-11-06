@@ -21,6 +21,14 @@
  */
 
 #include <gtest/gtest.h>
+#include <memory>
+
+#ifndef NO_QT_SUPPORT
+#include "engraving/dom/factory.h"
+#include "engraving/dom/image.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/svgdrawing.h"
+#endif
 
 #include "engraving/dom/lyrics.h"
 #include "engraving/dom/masterscore.h"
@@ -162,3 +170,43 @@ TEST_F(Engraving_LayoutElementsTests, tstLayoutCrossStaffArp)
 
     delete score;
 }
+
+#ifndef NO_QT_SUPPORT
+TEST_F(Engraving_LayoutElementsTests, drawingLayoutWaitsForPagination)
+{
+    std::unique_ptr<MasterScore> score(ScoreRW::readScore(u"measure_data/measure-10-ref.mscx"));
+    ASSERT_TRUE(score);
+    auto segment = score->firstMeasure()->first(SegmentType::ChordRest);
+    ASSERT_TRUE(segment);
+    auto system = segment->measure()->system();
+    ASSERT_TRUE(system);
+    auto page = system->page();
+    ASSERT_TRUE(page);
+
+    Image* image = Factory::createImage(segment);
+    image->setTrack(0);
+    image->setAutoplace(false);
+    image->setDrawingPart("rigid");
+    image->setDrawingData(R"({"version":1,"nativeOwner":"MuseDrawNative","rigid":true,
+        "fixedX":1,"fixedY":2,"fixedWidth":3,"fixedHeight":4,
+        "source":{"bounds":{"x":0,"y":0,"width":3,"height":4},
+        "shapes":[{"kind":"path","commands":[["M",0,0],["L",3,4]],"style":{"width":1}}]}})");
+    segment->add(image);
+    const auto serialized = image->drawingData();
+
+    // Reproduce the first layout pass while collectSystem has no page yet.
+    system->resetExplicitParent();
+    const bool handledWithoutPage = SvgDrawing::layout(image, image->mutldata());
+    system->setParent(page);
+    EXPECT_FALSE(handledWithoutPage);
+    EXPECT_EQ(image->drawingData(), serialized);
+
+    // Normal reflow must still place the drawing in the final drawing pass.
+    score->doLayout();
+    EXPECT_DOUBLE_EQ(image->ldata()->bbox().width(), 3 * image->spatium());
+    EXPECT_DOUBLE_EQ(image->ldata()->bbox().height(), 4 * image->spatium());
+    EXPECT_DOUBLE_EQ(image->ldata()->pos().x(), image->spatium());
+    EXPECT_DOUBLE_EQ(image->ldata()->pos().y(), 2 * image->spatium());
+    EXPECT_EQ(image->drawingData(), serialized);
+}
+#endif

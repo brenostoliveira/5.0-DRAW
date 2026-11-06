@@ -56,8 +56,14 @@ FlatButton {
                     function box(x, y) {
                         c.strokeRect(x - 2.2, y - 2.2, 4.4, 4.4);
                     }
-                    if (["wave", "polygon", "star", "rounded-rectangle", "diamond", "cross", "objects"].indexOf(glyph) >= 0) {
-                        if (glyph === "wave") {
+                    if (["wave", "noise", "polygon", "star", "rounded-rectangle", "diamond", "cross", "objects"].indexOf(glyph) >= 0) {
+                        if (glyph === "noise") {
+                            for (var dot = 0; dot < 32; dot++) {
+                                c.beginPath();
+                                c.arc(6 + (dot * 17 % 29), 9 + (dot * 11 % 23), 1.2, 0, 2 * Math.PI);
+                                c.fill();
+                            }
+                        } else if (glyph === "wave") {
                             c.beginPath();
                             c.moveTo(5, 20);
                             for (var wi = 1; wi <= 60; wi++)

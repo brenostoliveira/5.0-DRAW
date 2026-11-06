@@ -20,6 +20,7 @@ Item {
     property bool sliderBusy: false
     readonly property bool erase: group === "eraser"
     readonly property bool stroke: ["pencil", "pen", "shapes"].indexOf(group) >= 0 || !!(editor && editor.styleEditActive)
+    readonly property bool noise: !!editor && (editor.tool === "noise" || (editor.shapeEditActive && editor.shapes[editor.selected].kind === "noise"))
     readonly property bool music: ["select", "pencil", "pen", "shapes", "nodes"].indexOf(group) >= 0 && editor && editor.tool !== "unlink"
     implicitHeight: content.implicitHeight
     function tr(s) {
@@ -292,10 +293,12 @@ Item {
             StyledTextLabel {
                 horizontalAlignment: Text.AlignLeft
                 text: root.tr(root.group === "pencil" ? "Pointer size: " : "Stroke width: ") + (root.editor ? Math.round(root.editor.strokeWidth) : 30)
+                visible: !root.noise
             }
             IncrementalPropertyControl {
                 width: parent.width
                 minValue: root.editor && root.editor.styleEditActive ? 0.1 : 1
+                visible: !root.noise
                 maxValue: 1000
                 step: root.editor && root.editor.styleEditActive ? 0.1 : 1
                 decimals: root.editor && root.editor.styleEditActive ? 1 : 0
@@ -309,13 +312,14 @@ Item {
                 width: parent.width
                 from: 1
                 to: 1000
+                visible: !root.noise
                 stepSize: 1
                 value: root.editor ? root.editor.strokeWidth : 30
                 onPressedChanged: root.adjusting(pressed, true, false)
                 onMoved: root.editor.strokeWidth = value
             }
             CheckBox {
-                visible: root.group === "shapes" || root.group === "pen"
+                visible: !root.noise && (root.group === "shapes" || root.group === "pen")
                 text: root.tr("Fill shapes")
                 checked: root.editor ? root.editor.filled : false
                 onClicked: root.editor.filled = !checked

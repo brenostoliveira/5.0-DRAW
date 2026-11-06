@@ -374,10 +374,19 @@ Item {
             }
         });
     }
-    onStrokeWidthChanged: if (styleEditActive)
-        applyNodeStyle({
+    onStrokeWidthChanged: {
+        if (styleEditActive) applyNodeStyle({
             width: Math.max(0.001, Math.min(1000000, pointerMode === "fixed" ? strokeWidth / Math.max(0.02, viewScale) : strokeWidth))
-        })
+        });
+        else if (shapeEditActive && shapes[selected].kind === "noise") {
+            var all = shapes.slice(), sh = Vector.copy(all[selected]);
+            sh.style.width = pointerMode === "fixed" ? strokeWidth / Math.max(0.02, viewScale) : strokeWidth;
+            if (!Parametric.isNoiseGuide(sh)) sh.commands = Parametric.waveCommands(sh.wave, sh.style.width);
+            all[selected] = sh;
+            shapes = all;
+            requestPaint();
+        }
+    }
     onStrokeOpacityChanged: if (styleEditActive)
         applyNodeStyle({
             opacity: strokeOpacity
@@ -516,6 +525,10 @@ Item {
                 waveform: sh.wave.waveform,
                 layoutMode: sh.wave.layoutMode
             });
+        if (sh.kind === "noise") {
+            shapeParameters = Object.assign({}, shapeParameters, {density: sh.wave.density, verticalSpacing: sh.wave.stops[0].period});
+            strokeWidth = sh.style.width * (pointerMode === "fixed" ? Math.max(0.02, viewScale) : 1);
+        }
         requestPaint();
         forceActiveFocus();
     }
@@ -556,13 +569,16 @@ Item {
             return;
         var all = shapes.slice(), sh = Vector.copy(all[shapeEditSession.index]);
         if (sh.wave) {
-            if (key === "amplitude" || key === "period")
+            if (key === "amplitude" || key === "period" || key === "verticalSpacing")
                 sh.wave.stops.forEach(function (stop) {
-                    stop[key] = value;
+                    stop[key === "verticalSpacing" ? "period" : key] = value;
                 });
+            else if (key === "density" && sh.kind === "noise")
+                sh.wave.density = Math.max(1, Math.min(100, value));
             else if (key === "waveform" || key === "layoutMode")
                 sh.wave[key] = value;
-            sh.commands = Parametric.waveCommands(sh.wave);
+            if (sh.kind === "noise") sh.wave.layoutMode = "continue";
+            if (!Parametric.isNoiseGuide(sh)) sh.commands = Parametric.waveCommands(sh.wave, sh.style.width);
         } else if (sh.parametric) {
             sh = Parametric.rebuild(sh, shapeParameters);
         }
@@ -573,6 +589,8 @@ Item {
         requestPaint();
     }
     function shapeHandleName(handle) {
+        if (handle.role === "noise-spread") return qsTrc("drawing-tools", "Vertical spread / envelope");
+        if (handle.role === "noise-spacing") return qsTrc("drawing-tools", "Vertical spacing");
         var names = {
             "wave-amplitude": "Amplitude / envelope",
             "wave-period": "Wavelength",
@@ -592,6 +610,8 @@ Item {
             roundness: 0.2,
             amplitude: 20,
             period: 40,
+            verticalSpacing: 8,
+            density: 25,
             waveform: "sine",
             layoutMode: "continue"
         })
@@ -1274,7 +1294,7 @@ Item {
         }
     }
     function isBasicShape(key) {
-        return ["line", "rectangle", "ellipse", "triangle", "right-triangle", "arrow", "arrow-double", "arrow-filled", "wave", "polygon", "star", "rounded-rectangle", "diamond", "cross"].indexOf(key) >= 0;
+        return ["line", "rectangle", "ellipse", "triangle", "right-triangle", "arrow", "arrow-double", "arrow-filled", "wave", "noise", "polygon", "star", "rounded-rectangle", "diamond", "cross"].indexOf(key) >= 0;
     }
     function reanchorMovedSelection(targets, force) {
         if (nodeEditActive && !force) {
@@ -1529,9 +1549,14 @@ Item {
         return page;
     }
     function nearestCreationAnchor(x, y) {
-        var page = anchorPageAt(x, y), target = null, distance = Infinity;
+        var page = anchorPageAt(x, y), system = Vector.anchorSystemAt(anchorSystems, x, y, page);
+        var target = null, distance = Infinity;
+        var covered = rhythmMarkers.some(function (m) {
+            return (system === null || m.system === system) && (page === null || m.page === page) && Vector.anchorCoversX(m, x);
+        });
         rhythmMarkers.forEach(function (m) {
-            if (page !== null && m.page !== page)
+            if ((page !== null && m.page !== page) || (system !== null && m.system !== system)
+                || (covered && !Vector.anchorCoversX(m, x)))
                 return;
             var d = Math.hypot(m.x - x, (m.railY === undefined ? m.y : m.railY) - y);
             if (d < distance) {
@@ -1554,6 +1579,11 @@ Item {
                 if (link.shape !== selected || link.command !== handle.command || link.field !== handle.field)
                     continue;
                 var reference = markerForBinding(link);
+                // A temporarily hidden attachment is not a request to move
+                // the node to another staff or system. Explicit linking may
+                // still select a new visible target.
+                if (!reference)
+                    return null;
                 if (reference) {
                     referenceY = reference.y;
                     referenceRow = reference.row;
@@ -1561,12 +1591,23 @@ Item {
                 break;
             }
         var rows = (gridOnly ? gridMarkerTable : markerTable).groups, list = null, rowDistance = Infinity, page = anchorPageAt(x, y);
-        Object.keys(rows).forEach(function (key) {
-            var row = rows[key], dy = Math.abs(row[0].y - referenceY);
+        var system = referenceRow === null ? Vector.anchorSystemAt(anchorSystems, x, y, page) : null;
+        var rowKeys = Object.keys(rows);
+        var covered = rowKeys.some(function (key) {
+            var row = rows[key], m = row[0];
+            return (system === null || m.system === system) && (page === null || m.page === page) && Vector.anchorRowCoversX(row, x);
+        });
+        rowKeys.forEach(function (key) {
+            var row = rows[key];
             if (referenceRow !== null && row[0].row !== referenceRow)
                 return;
             if (referenceRow === null && page !== null && row[0].page !== page)
                 return;
+            if (system !== null && row[0].system !== system)
+                return;
+            if (covered && !Vector.anchorRowCoversX(row, x))
+                return;
+            var dy = Math.abs(row[0].y - referenceY);
             var dx = Math.max(row[0].x - x, 0, x - row[row.length - 1].x);
             var distance = Math.hypot(dx, dy);
             if (distance < rowDistance) {
@@ -1587,6 +1628,8 @@ Item {
         }
         for (var index = Math.max(0, low - 1); index <= Math.min(list.length - 1, low); index++) {
             var m = list[index];
+            if (covered && !Vector.anchorCoversX(m, x))
+                continue;
             var d = Math.abs(m.x - x);
             if (d < distance) {
                 target = m;
@@ -1762,6 +1805,16 @@ Item {
         });
         return pages;
     }
+    readonly property var anchorSystems: {
+        var seen = {}, systems = [];
+        rhythmMarkers.forEach(function (m) {
+            if (m.system !== undefined && !seen[m.system]) {
+                seen[m.system] = true;
+                systems.push(m);
+            }
+        });
+        return systems;
+    }
     readonly property var gridMarkerTable: buildGridTable(rhythmMarkers)
     function buildMarkerTable(grid, links, drawings) {
         var base = gridMarkerTable, groups = null, indices = null, markers = null, changedRows = {};
@@ -1806,7 +1859,15 @@ Item {
                 pageX: nearest.pageX,
                 pageY: nearest.pageY,
                 pageWidth: nearest.pageWidth,
-                pageHeight: nearest.pageHeight
+                pageHeight: nearest.pageHeight,
+                staff: nearest.staff,
+                system: nearest.system,
+                systemTop: nearest.systemTop,
+                systemBottom: nearest.systemBottom,
+                systemLeft: nearest.systemLeft,
+                systemRight: nearest.systemRight,
+                measureLeft: nearest.measureLeft,
+                measureRight: nearest.measureRight
             };
             var row = p.row === undefined ? String(p.y) : p.row;
             if (!changedRows[row]) {
@@ -2044,6 +2105,7 @@ Item {
             ] : [];
         }
         var handles = Vector.linkedHandles(shapes[selected], bindings, selected);
+        if (Parametric.isNoiseGuide(shapes[selected])) return handles;
         var ends = contextualRhythmMarkers && !nodeEditActive && !pendingBinding && !(tool === "anchors" && selectedHandle) && !contextLinkTargets.length && hasNativeFragments(shapes[selected]) ? Editing.fragmentHandles(root) : [];
         return ends.length ? handles.filter(function (h) {
             return !h.endpoint;
@@ -2138,7 +2200,7 @@ Item {
         invalidateReflow(selected);
         var shift = replacement.length - (to - from + 1);
         commands.splice.apply(commands, [from, to - from + 1].concat(replacement));
-        delete shape.wave;
+        if (!Parametric.isNoiseGuide(shape)) delete shape.wave;
         if (shape.segmentStyles) {
             shape.segmentStyles = shape.segmentStyles.filter(function (m) {
                 return m.command < from || m.command > to || mapping[m.command] !== undefined;
@@ -2772,7 +2834,7 @@ Item {
             insertedCount = 2;
         }
 
-        delete a[selected].wave;
+        if (!Parametric.isNoiseGuide(a[selected])) delete a[selected].wave;
         a[selected] = Vector.insertPoint(a[selected], point.command, point.t);
         if (a[selected].kind === "fused") {
             a[selected].singleAnchor = false;
@@ -3200,6 +3262,10 @@ Item {
                     root.shapes = all;
                     if (all[root.selected].parametric)
                         root.shapeParameters = Object.assign({}, root.shapeParameters, all[root.selected].parametric);
+                    if (all[root.selected].kind === "noise") {
+                        var stop = all[root.selected].wave.stops[modelData.index];
+                        root.shapeParameters = Object.assign({}, root.shapeParameters, {amplitude: stop.amplitude, verticalSpacing: stop.period});
+                    }
                     root.requestPaint();
                 }
                 onReleased: {
@@ -3253,6 +3319,11 @@ Item {
 
             if (preview)
                 Vector.paint(ctx, [preview]);
+            if (root.anchorEditingActive && root.selected >= 0 && Parametric.isNoiseGuide(root.shapes[root.selected])) {
+                // An editing overlay only: it never enters SVG export or the score.
+                Vector.paint(ctx, [{commands: root.shapes[root.selected].commands,
+                    style: Vector.style("#576e80", "none", 1.5 / root.viewScale, 0.65)}]);
+            }
             if (root.drawingEnabled && Painting.gradientTool(root.tool) && root.selected >= 0 && root.currentGradient) {
                 var g = root.gradientHandles, a = g[0], b = g[1];
                 ctx.strokeStyle = "#20aaad";
@@ -3634,6 +3705,8 @@ Item {
             root.snapTarget = null;
             root.deformationSession = null;
             gestureTool = root.tool;
+            if (gestureTool === "noise")
+                root.shapeParameters = Object.assign({}, root.shapeParameters, {seed: Math.floor(Math.random() * 10000) + 1});
             gestureSmoothing = root.smoothing;
             points = [];
             original = null;
@@ -3880,7 +3953,7 @@ Item {
 
                 if (root.selectionTool && !boxSelecting)
                     captureSelection();
-                if (root.selectedHandle && root.shapes[root.selected] && root.shapes[root.selected].wave) {
+                if (root.selectedHandle && root.shapes[root.selected] && root.shapes[root.selected].wave && !Parametric.isNoiseGuide(root.shapes[root.selected])) {
                     root.remember();
                     var converted = root.shapes.slice();
                     converted[root.selected] = Vector.copy(converted[root.selected]);
@@ -4124,7 +4197,7 @@ Item {
                 // entire document here serialized every unrelated path per move.
                 var s = root.shapes.slice();
 
-                if (root.selectedHandle && root.shapes[root.selected].wave) {
+                if (root.selectedHandle && root.shapes[root.selected].wave && !Parametric.isNoiseGuide(root.shapes[root.selected])) {
                     root.remember();
                     var editable = root.shapes.slice();
                     editable[root.selected] = Vector.copy(editable[root.selected]);

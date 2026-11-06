@@ -228,7 +228,7 @@ function bounds(shapes) {
 
     var x=Infinity,y=Infinity,r=-Infinity,b=-Infinity;
     for(var i=0;i<shapes.length;i++){
-        var sh=shapes[i],extent=sh.style.width*nibExtentMultiplier(sh.style);
+        var sh=P.renderNoise(shapes[i]),extent=sh.style.width*nibExtentMultiplier(sh.style);
         (sh.paintRanges||[]).forEach(function(range){extent=Math.max(extent,range.style.width*nibExtentMultiplier(range.style));});
         var pad=sh.svgSource?0:extent/2+1,lx=Infinity,ly=Infinity,rx=-Infinity,by=-Infinity;
         (sh.derivedWholeCommands||sh.commands).forEach(function(c){for(var n=1;n<c.length;n+=2){
@@ -277,7 +277,7 @@ function checkedStyle(saved){
 
 function body(shapes, parentId) {
 
-    return shapes.map(function(sh,index) {var s=sh.style;
+    return shapes.map(function(sh,index) {sh=P.renderNoise(sh);var s=P.noiseStyle(sh.wave,sh.style);
 
         var clip=sh.clipRect,id=(parentId||'draw')+'clip'+index
         var prefix=clip?'<defs><clipPath id="'+id+'"><rect x="'+num(clip.x)+'" y="'+num(clip.y)+'" width="'+num(clip.width)+'" height="'+num(clip.height)+'"/></clipPath></defs><g clip-path="url(#'+id+')">':''
@@ -315,7 +315,7 @@ function paintedParts(shape){
         if(saved.commands===shape.commands && saved.ranges===shape.paintRanges && saved.frame===shape.paintFrame)return saved.parts;
     }
     var frame=shape.paintFrame||paintBounds(shape.commands);
-    var parts=shape.paintRanges.map(function(range){return {commands:rangeCommands(shape.commands,range.start,range.end),style:range.style,fillRule:range.fillRule,paintFrame:frame};});
+    var parts=shape.paintRanges.map(function(range){return {commands:rangeCommands(shape.commands,range.start,range.end),style:range.style,fillRule:range.fillRule,paintFrame:frame,wave:shape.wave};});
     paintedPartsCache.push({commands:shape.commands,ranges:shape.paintRanges,frame:shape.paintFrame,parts:parts});
     var weight=paintedPartsCache.reduce(function(n,entry){return n+entry.commands.length;},0);
     while(paintedPartsCache.length>1 && (paintedPartsCache.length>64 || weight>100000))weight-=paintedPartsCache.shift().commands.length;
@@ -557,8 +557,9 @@ function hit(shapes,x,y,tolerance,svgContains,nativeContains) {
         if(x<b.x-tolerance||x>b.x+b.width+tolerance||y<b.y-tolerance||y>b.y+b.height+tolerance)continue;
         if(sh.style&&sh.style.opacity===0)continue;
         if(sh.svgSource&&svgContains){if(svgContains(sh,x,y,tolerance))return i;continue;}
-        if(nearestSegment(sh,x,y,tolerance+(sh.style.width||0)/2))return i;
-        if(sh.style.fill&&sh.style.fill!=="none"&&insideFill(sh,x,y))return i;
+        var drawn=P.renderNoise(sh),style=P.noiseStyle(sh.wave,sh.style);
+        if(nearestSegment(drawn,x,y,tolerance+(sh.style.width||0)/2))return i;
+        if(style.fill&&style.fill!=="none"&&insideFill(drawn,x,y))return i;
     }
     return -1;
 }
@@ -716,12 +717,46 @@ function insertPoint(sh,index,t,inPlace) {
 
 }
 
-// Insert exact curve intersections with the nearest staff's rhythmic grid.
+// Choose the displayed system vertically before comparing staff/measure positions.
+// A hidden row must not win merely because another system has a closer time column.
+function anchorSystemAt(markers, x, y, page) {
+    var seen={}, target=null, vertical=Infinity, horizontal=Infinity, center=Infinity;
+    markers.forEach(function(m){
+        if(m.system===undefined||seen[m.system]||(page!==null&&page!==undefined&&m.page!==page))return;
+        seen[m.system]=true;
+        var dy=Math.max(m.systemTop-y,0,y-m.systemBottom);
+        var dx=Math.max(m.systemLeft-x,0,x-m.systemRight);
+        var middle=Math.abs((m.systemTop+m.systemBottom)/2-y);
+        if(dy<vertical||(dy===vertical&&(dx<horizontal||(dx===horizontal&&middle<center)))){
+            target=m.system;vertical=dy;horizontal=dx;center=middle;
+        }
+    });
+    return target;
+}
+
+function anchorCoversX(marker, x) {
+    return marker.measureLeft===undefined||marker.measureRight===undefined
+        ||(x>=marker.measureLeft-0.001&&x<=marker.measureRight+0.001);
+}
+
+// Rows are ordered by x. Inspect the adjacent columns without filtering
+// every rhythmic subdivision again during pointer movement.
+function anchorRowCoversX(row, x) {
+    var low=0,high=row.length;
+    while(low<high){var mid=Math.floor((low+high)/2);if(row[mid].x<x)low=mid+1;else high=mid;}
+    return (low<row.length&&anchorCoversX(row[low],x))
+        ||(low>0&&anchorCoversX(row[low-1],x));
+}
+
+// Insert exact curve intersections with the nearest visible staff's rhythmic grid.
 
 function autoAnchors(sh, markers, shapeIndex, manualHeads) {
-
+    sh=P.upgradeNoise(sh);
     var out=copy(sh), links=[],manual=copy(manualHeads||[]),commandMapping=sh.commands.map(function(c,i){return i;});
-    if(sh.wave){
+    var box=P.isNoiseGuide(sh)?paintBounds(sh.commands):bounds([sh]), middle=box.y+box.height/2;
+    var system=anchorSystemAt(markers,box.x+box.width/2,middle,null);
+    if(system!==null)markers=markers.filter(function(m){return m.system===system;});
+    if(sh.wave&&!P.isNoiseGuide(sh)){
         [out.commands.length-2,out.commands.length-1].forEach(function(ci){var c=out.commands[ci],target=null,best=Infinity;markers.forEach(function(m){var d=Math.hypot(c[1]-m.x,c[2]-m.y);if(d<best){best=d;target=m;}});if(target)links.push({shape:shapeIndex,command:ci,field:1,key:target.key,numerator:target.numerator,denominator:target.denominator,scale:target.scale||1,offsetX:(c[1]-(target.bindingX===undefined?target.x:target.bindingX))/(target.scale||1),offsetY:(c[2]-target.y)/(target.scale||1),editable:true});});
         return {shape:out,bindings:links};
     }
@@ -730,8 +765,10 @@ function autoAnchors(sh, markers, shapeIndex, manualHeads) {
 
     if(!markers.length)return {shape:out,bindings:links};
 
-    var box=bounds([sh]), middle=box.y+box.height/2, nearest=null, distance=Infinity;
+    var nearest=null, distance=Infinity;
+    var covered=markers.some(function(m){return anchorCoversX(m,box.x+box.width/2);});
     markers.forEach(function(m){
+        if(covered&&!anchorCoversX(m,box.x+box.width/2))return;
         var dx=Math.max(box.x-m.x,0,m.x-box.x-box.width),dy=Math.abs(m.y-middle);
         var d=Math.hypot(dx,dy);
         if(d<distance){nearest=m;distance=d;}
@@ -983,16 +1020,19 @@ function readDocument(text) {
 
     });
 
-    return d.shapes;
+    return d.shapes.map(P.upgradeNoise);
 
 }
 
 function paint(ctx, shapes, selected) {
 
     shapes.forEach(function(sh) {
+        var active=selected&&selected.indexOf(sh)>=0;
+        sh=P.renderNoise(sh);
+        if(sh.wave&&sh.wave.waveform==="noise")sh=Object.assign({},sh,{style:P.noiseStyle(sh.wave,sh.style)});
         if(sh.paintRanges){
             ctx.save();if(sh.clipRect){var r=sh.clipRect;ctx.beginPath();ctx.rect(r.x,r.y,r.width,r.height);ctx.clip();}
-            var parts=paintedParts(sh);paint(ctx,parts,selected&&selected.indexOf(sh)>=0?parts:[]);ctx.restore();return;
+            var parts=paintedParts(sh);paint(ctx,parts,active?parts:[]);ctx.restore();return;
         }
         if(sh.svgSource)return;
         var outline=nibOutline(sh.derivedWholeCommands||sh.commands,sh.style);
@@ -1002,9 +1042,8 @@ function paint(ctx, shapes, selected) {
             if(nibStyle.strokeGradient)nibStyle.fillGradient=nibStyle.strokeGradient;else delete nibStyle.fillGradient;delete nibStyle.strokeGradient;
             var strokeShape={commands:outline,style:nibStyle,paintFrame:sh.paintFrame||paintBounds(sh.derivedWholeCommands||sh.commands),clipRect:sh.clipRect};
             var parts=sh.style.fill!=="none"?[fillShape,strokeShape]:[strokeShape];
-            paint(ctx,parts,selected&&selected.indexOf(sh)>=0?parts:[]);return;
+            paint(ctx,parts,active?parts:[]);return;
         }
-        var active=selected&&selected.indexOf(sh)>=0;
         ctx.save()
         if(sh.clipRect){var clip=sh.clipRect;ctx.beginPath();ctx.rect(clip.x,clip.y,clip.width,clip.height);ctx.clip()}
         ctx.beginPath();(sh.derivedWholeCommands||sh.commands).forEach(function(c) {
@@ -1028,6 +1067,8 @@ function paint(ctx, shapes, selected) {
 
 }
 
+function isNoiseGuide(shape){return P.isNoiseGuide(shape);}
+
 if(typeof module!=="undefined") module.exports={smooth:smooth,pen:pen,shape:shape,bounds:bounds,svg:svg,insertPoint:insertPoint,curvePoint:curvePoint,
 
-    style:style,readDocument:readDocument,document:document,translate:translate,hit:hit,handles:handles};
+    style:style,readDocument:readDocument,document:document,translate:translate,hit:hit,handles:handles,isNoiseGuide:isNoiseGuide};

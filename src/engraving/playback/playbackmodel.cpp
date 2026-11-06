@@ -1005,6 +1005,13 @@ bool PlaybackModel::shouldSkipChanges(const ScoreChanges& changes) const
         return true;
     }
 
+    // Image edits, including drawing metadata, do not change played music.
+    // Keep mixed musical edits and score-wide changes on the normal path.
+    if (changes.changedTypes.size() == 1 && muse::contains(changes.changedTypes, ElementType::IMAGE)
+        && changes.changedStyleIdSet.empty() && !hasToReloadScore(changes)) {
+        return true;
+    }
+
     if (changes.changedObjects.size() != 1) {
         return false;
     }

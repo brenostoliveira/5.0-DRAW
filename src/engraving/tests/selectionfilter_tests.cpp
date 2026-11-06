@@ -21,6 +21,14 @@
  */
 
 #include <gtest/gtest.h>
+#include <memory>
+
+#ifndef NO_QT_SUPPORT
+#include "engraving/dom/factory.h"
+#include "engraving/dom/image.h"
+#include "engraving/dom/segment.h"
+#include "engraving/dom/svgdrawing.h"
+#endif
 
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
@@ -39,6 +47,52 @@ public:
     void testFilterSpanner(int idx, const SelectionFilterTypesVariant& type);
     void testNotesInChordsAction(void (*action)(Score*, MeasureBase*), const String& reference);
 };
+
+#ifndef NO_QT_SUPPORT
+TEST_F(Engraving_SelectionFilterTests, rangeExcludesDrawingEditorImages)
+{
+    std::unique_ptr<MasterScore> score(ScoreRW::readScore(u"measure_data/measure-10-ref.mscx"));
+    ASSERT_TRUE(score);
+    Measure* measure = score->firstMeasure();
+    ASSERT_TRUE(measure);
+    Segment* segment = measure->first(SegmentType::ChordRest);
+    ASSERT_TRUE(segment);
+
+    Image* drawing = Factory::createImage(segment);
+    drawing->setTrack(0);
+    drawing->setDrawingData(R"({"version":1,"nativeOwner":"MuseDrawNative"})");
+    segment->add(drawing);
+    Image* ordinaryImage = Factory::createImage(segment);
+    ordinaryImage->setTrack(0);
+    segment->add(ordinaryImage);
+
+    // Leaving drawing mode also removes a pre-existing notation selection.
+    score->selection().add(drawing);
+    ASSERT_TRUE(drawing->selected());
+    SvgDrawing::setEditing(score.get(), false);
+    EXPECT_FALSE(drawing->selected());
+    EXPECT_TRUE(score->selection().elements().empty());
+
+    for (bool editing : { false, true, false }) {
+        SvgDrawing::setEditing(score.get(), editing);
+        score->select(measure);
+        EXPECT_TRUE(score->selection().isRange());
+        EXPECT_FALSE(drawing->selected());
+        EXPECT_FALSE(score->selectionFilter().canSelect(drawing));
+        EXPECT_TRUE(ordinaryImage->selected());
+        EXPECT_TRUE(segment->element(0)->selected());
+        EXPECT_EQ(drawing->hiddenByDrawingEditor(), editing);
+
+        // Removing an old drawing selection must preserve the selected music.
+        score->selection().add(drawing);
+        SvgDrawing::setEditing(score.get(), editing);
+        EXPECT_FALSE(drawing->selected());
+        EXPECT_TRUE(score->selection().isRange());
+        EXPECT_TRUE(ordinaryImage->selected());
+        EXPECT_TRUE(segment->element(0)->selected());
+    }
+}
+#endif
 
 void Engraving_SelectionFilterTests::testFilter(int idx, const SelectionFilterTypesVariant& type)
 {

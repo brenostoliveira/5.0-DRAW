@@ -11,7 +11,7 @@ function constrained(a,b,modifiers){
     return {a:modifiers.shift||modifiers.control?{x:a.x-dx,y:a.y-dy}:a,b:{x:a.x+dx,y:a.y+dy}};
 }
 function basicShape(kind,a,b,style,options){
-    if(["wave","polygon","star","rounded-rectangle","diamond","cross"].indexOf(kind)>=0)return P.create(kind,a,b,style,options);
+    if(["wave","noise","polygon","star","rounded-rectangle","diamond","cross"].indexOf(kind)>=0)return P.create(kind,a,b,style,options);
     if(["line","rectangle","ellipse"].indexOf(kind)>=0)return V.shape(kind,a,b,style);
     if(["arrow","arrow-double","arrow-filled"].indexOf(kind)>=0)return V.arrowShape(kind,a,b,style);
     var x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y),c;
@@ -279,6 +279,7 @@ function moveFragment(editor,original,handle,dx,dy){
     editor.liveFragmentEdit=true;editor.changed();
 }
 function deformationFragments(editor){
+    if(editor.selected>=0&&V.isNoiseGuide(editor.shapes[editor.selected]))return null;
     var session=editor.deformationSession,sh=session&&editor.shapes[session.shape];
     if(!session||session.shape!==editor.selected||!sh||sh.svgSource||sh.singleAnchor||sh.drawId!==session.original.drawId)return null;
     var original=session.original.commands,current=sh.commands;

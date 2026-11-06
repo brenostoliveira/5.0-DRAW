@@ -1542,6 +1542,64 @@ QString styledRanges(const QJsonArray& ranges, const QStringList& commands, cons
     return body;
 }
 
+QJsonObject noiseStyle(const QJsonObject& wave, QJsonObject style)
+{
+    if (wave.value("waveform").toString() != "noise") {
+        return style;
+    }
+    const bool solid = wave.value("density").toDouble(25) >= 100;
+    style["fill"] = solid ? style.value("stroke") : QJsonValue("none");
+    style["lineCap"] = "round";
+    style["linePattern"] = "solid";
+    style.remove("nib");
+    style.remove("fillGradient");
+    if (solid && style.contains("strokeGradient")) {
+        style["fillGradient"] = style.value("strokeGradient");
+    }
+    return style;
+}
+
+bool noiseGuide(const QJsonObject& shape)
+{
+    const auto wave = shape.value("wave").toObject();
+    return wave.value("waveform").toString() == "noise" && wave.value("guideVersion").toInt() == 1;
+}
+
+QJsonArray nestedNoiseGuide(const QJsonArray& commands)
+{
+    QJsonArray result;
+    for (const auto& value : commands) {
+        const auto command = value.toArray();
+        if (command.isEmpty()) {
+            continue;
+        }
+        QJsonArray mapped { command[0] };
+        for (int i = 1; i + 1 < command.size(); i += 2) {
+            mapped.append(QJsonArray { command[i], command[i + 1] });
+        }
+        result.append(mapped);
+    }
+    return result;
+}
+
+QJsonArray flatNoiseCommands(const QJsonArray& commands)
+{
+    QJsonArray result;
+    for (const auto& value : commands) {
+        const auto command = value.toArray();
+        QJsonArray mapped { command[0] };
+        for (int i = 1; i < command.size(); ++i) {
+            const auto point = command[i].toArray();
+            mapped.append(point[0]);
+            mapped.append(point[1]);
+        }
+        result.append(mapped);
+    }
+    return result;
+}
+
+QJsonArray noiseCommands(const QJsonObject& wave, const QJsonArray& guide, double diameter);
+
 QString rigidSvg(const QJsonObject& source)
 {
     const auto box=source.value("bounds").toObject();
@@ -1551,7 +1609,14 @@ QString rigidSvg(const QJsonObject& source)
     }
     QString body;
     for (const auto& v:source.value("shapes").toArray()) {
-        const auto shape=v.toObject(), style=shape.value("style").toObject();
+        auto shape=v.toObject();
+        const auto style=noiseStyle(shape.value("wave").toObject(), shape.value("style").toObject());
+        if (noiseGuide(shape)) {
+            shape["commands"] = flatNoiseCommands(noiseCommands(shape.value("wave").toObject(),
+                                                               nestedNoiseGuide(shape.value("commands").toArray()),
+                                                               style.value("width").toDouble()));
+            shape.remove("paintRanges");
+        }
         if (!shape.value("svgSource").toString().isEmpty()) {
             body+=assetBody(assetSource(shape), shape.value("svgMatrix").toArray(), style.value("opacity").toDouble());
             continue;
@@ -1623,7 +1688,7 @@ bool rigidArrowHeadPoint(const QJsonObject& head, const QJsonArray& commands, QP
     return std::isfinite(result->x()) && std::isfinite(result->y());
 }
 
-QJsonArray waveCommands(const QJsonObject& wave, const QJsonArray& a, const QJsonArray& b, int fixedSamples = 0)
+QJsonArray waveCommands(const QJsonObject& wave, const QJsonArray& a, const QJsonArray& b, int fixedSamples = 0, double diameter = 1)
 {
     if (a.size() != 2 || b.size() != 2) {
         return {};
@@ -1651,6 +1716,68 @@ QJsonArray waveCommands(const QJsonObject& wave, const QJsonArray& a, const QJso
     if (!std::isfinite(length) || length < 0.000001) {
         return {};
     }
+    if (wave.value("waveform").toString() == "noise") {
+        // The same seeded cells as Parametric.noiseCommands. Regenerate at
+        // the current musical length instead of scaling the stored dots.
+        QJsonArray result;
+        const double ux = dx / length, uy = dy / length;
+        const double density = std::clamp(wave.value("density").toDouble(25), 1.0, 100.0);
+        diameter = std::max(0.001, diameter);
+        auto push = [&](const char* op, double x, double y) {
+            result.append(QJsonArray { op, QJsonArray { ax + ux * x - uy * y, ay + uy * x + ux * y } });
+        };
+        if (density >= 100) {
+            for (int i = 0; i < stops.size(); ++i) {
+                const auto stop = stops[i].toObject();
+                push(i ? "L" : "M", length * stop.value("t").toDouble(), stop.value("amplitude").toDouble());
+            }
+            for (int i = stops.size() - 1; i >= 0; --i) {
+                const auto stop = stops[i].toObject();
+                push("L", length * stop.value("t").toDouble(), -stop.value("amplitude").toDouble());
+            }
+            result.append(QJsonArray { "Z" });
+        } else {
+            auto random = [](double column, double row, double seed) {
+                seed = std::fmod(std::floor(std::abs(seed == 0 ? 1 : seed)), 10001.0);
+                double n = std::fmod((column + 1) * 73856093 + (row + 8192) * 19349663 + seed * 83492791, 2147483647.0);
+                if (n < 0) {
+                    n += 2147483647.0;
+                }
+                n = std::fmod(n * 48271, 2147483647.0);
+                n = double(quint32(std::floor(n / 256)) ^ quint32(std::fmod(n, 65536.0)));
+                return std::fmod(n * 48271, 2147483647.0) / 2147483647.0;
+            };
+            const double seed = wave.value("seed").toDouble(1) == 0 ? 1 : wave.value("seed").toDouble(1);
+            const double pitch = std::max(0.001, diameter * 0.75), columns = std::ceil(length / pitch);
+            const double columnStep = std::max(1.0, std::ceil(columns / 1024)), columnCount = std::ceil(columns / columnStep);
+            for (double column = 0; column < columns; column += columnStep) {
+                const double t = std::min(length, (column + 0.5) * pitch) / length;
+                const double amplitude = std::clamp(sample(t, "amplitude"), 0.0, 1000000.0);
+                const double spacing = std::max({ diameter * 0.7, sample(t, "period"), 0.001 });
+                const double rows = std::ceil(amplitude / spacing);
+                const double rowStep = std::max(1.0, std::ceil((2 * rows + 1) / std::max(1.0, std::floor(8192 / columnCount))));
+                for (double row = -rows; row <= rows; row += rowStep) {
+                    if (random(column, row, seed) >= density / 100) {
+                        continue;
+                    }
+                    const double x = (column + 0.1 + 0.8 * random(column, row, seed + 1)) * pitch;
+                    const double y = rows == 0 ? 0 : (row + 0.8 * (random(column, row, seed + 2) - 0.5)) * spacing;
+                    if (x > length || std::abs(y) > amplitude) {
+                        continue;
+                    }
+                    push("M", x, y);
+                    push("L", x + 0.001, y);
+                }
+            }
+            if (result.isEmpty()) {
+                push("M", length / 2, 0);
+                push("L", length / 2 + 0.001, 0);
+            }
+        }
+        result.append(QJsonArray { "M", a });
+        result.append(QJsonArray { "M", b });
+        return result;
+    }
     double period = 1e20;
     for (const auto& value : stops) {
         period = std::min(period, value.toObject().value("period").toDouble());
@@ -1672,6 +1799,113 @@ QJsonArray waveCommands(const QJsonObject& wave, const QJsonArray& a, const QJso
     }
     result.append(QJsonArray { "M", a });
     result.append(QJsonArray { "M", b });
+    return result;
+}
+
+QJsonArray noiseCommands(const QJsonObject& wave, const QJsonArray& guide, double diameter)
+{
+    struct Vertex { QPointF point; double distance; };
+    std::vector<Vertex> trace;
+    double length = 0;
+    auto push = [&](const QPointF& point) {
+        if (!trace.empty()) {
+            length += std::hypot(point.x() - trace.back().point.x(), point.y() - trace.back().point.y());
+        }
+        trace.push_back({ point, length });
+    };
+    for (const auto& value : guide) {
+        const auto command = value.toArray();
+        if (command.size() < 2) {
+            continue;
+        }
+        const auto point = command[1].toArray();
+        if (point.size() != 2) {
+            continue;
+        }
+        if (command[0] == "C" && command.size() == 4 && !trace.empty()) {
+            const auto a = trace.back().point;
+            const auto c = command[2].toArray(), b = command[3].toArray();
+            if (c.size() != 2 || b.size() != 2) {
+                continue;
+            }
+            for (int i = 1; i <= 24; ++i) {
+                const double t = double(i) / 24, u = 1 - t;
+                push(QPointF(u * u * u * a.x() + 3 * u * u * t * point[0].toDouble()
+                             + 3 * u * t * t * c[0].toDouble() + t * t * t * b[0].toDouble(),
+                             u * u * u * a.y() + 3 * u * u * t * point[1].toDouble()
+                             + 3 * u * t * t * c[1].toDouble() + t * t * t * b[1].toDouble()));
+            }
+        } else {
+            push(QPointF(point[0].toDouble(), point[1].toDouble()));
+        }
+    }
+    if (trace.size() < 2 || !std::isfinite(length) || length < 0.000001) {
+        return {};
+    }
+    auto at = [&](double distance, double offset) {
+        auto next = std::lower_bound(trace.begin() + 1, trace.end(), distance,
+                                     [](const Vertex& vertex, double position) { return vertex.distance < position; });
+        if (next == trace.end()) {
+            --next;
+        }
+        const auto& a = *(next - 1);
+        const double span = next->distance - a.distance;
+        const double t = span > 0 ? std::clamp((distance - a.distance) / span, 0.0, 1.0) : 0;
+        const double dx = next->point.x() - a.point.x(), dy = next->point.y() - a.point.y();
+        const double normal = std::max(0.000001, std::hypot(dx, dy));
+        return QJsonArray { a.point.x() + dx * t - dy / normal * offset,
+                            a.point.y() + dy * t + dx / normal * offset };
+    };
+    auto generated = waveCommands(wave, QJsonArray { 0, 0 }, QJsonArray { length, 0 }, 0, diameter);
+    if (wave.value("density").toDouble(25) >= 100) {
+        std::vector<double> positions;
+        for (const auto& vertex : trace) {
+            positions.push_back(vertex.distance);
+        }
+        const auto stops = wave.value("stops").toArray();
+        if (stops.isEmpty() || stops.size() > 128) {
+            return {};
+        }
+        for (const auto& value : stops) {
+            positions.push_back(length * value.toObject().value("t").toDouble());
+        }
+        std::sort(positions.begin(), positions.end());
+        positions.erase(std::unique(positions.begin(), positions.end(), [](double a, double b) {
+            return std::abs(a - b) < 0.000001;
+        }), positions.end());
+        auto amplitude = [&](double position) {
+            const double t = position / length;
+            auto a = stops.first().toObject(), b = a;
+            for (int i = 1; i < stops.size(); ++i) {
+                b = stops[i].toObject();
+                if (t <= b.value("t").toDouble()) {
+                    break;
+                }
+                a = b;
+            }
+            const double u = std::clamp((t - a.value("t").toDouble())
+                                        / std::max(0.00001, b.value("t").toDouble() - a.value("t").toDouble()), 0.0, 1.0);
+            return a.value("amplitude").toDouble() * (1 - u) + b.value("amplitude").toDouble() * u;
+        };
+        generated = {};
+        for (size_t i = 0; i < positions.size(); ++i) {
+            generated.append(QJsonArray { i ? "L" : "M", QJsonArray { positions[i], amplitude(positions[i]) } });
+        }
+        for (auto it = positions.rbegin(); it != positions.rend(); ++it) {
+            generated.append(QJsonArray { "L", QJsonArray { *it, -amplitude(*it) } });
+        }
+        generated.append(QJsonArray { "Z" });
+    }
+    QJsonArray result;
+    for (const auto& value : generated) {
+        const auto command = value.toArray();
+        QJsonArray mapped { command[0] };
+        for (int i = 1; i < command.size(); ++i) {
+            const auto p = command[i].toArray();
+            mapped.append(at(p[0].toDouble(), p[1].toDouble()));
+        }
+        result.append(mapped);
+    }
     return result;
 }
 
@@ -1753,10 +1987,11 @@ QJsonArray resolveGeometry(const QJsonObject& doc, const std::vector<Part>& part
             commands[it.key().toInt()]=command;
         }
         const auto wave = shape.value("wave").toObject();
-        if (!wave.isEmpty() && commands.size() >= 4 && wave.value("layoutMode").toString() == "continue") {
+        if (!noiseGuide(shape) && !wave.isEmpty() && commands.size() >= 4
+            && (wave.value("layoutMode").toString() == "continue" || wave.value("waveform").toString() == "noise")) {
             const auto a = commands[commands.size() - 2].toArray()[1].toArray();
             const auto b = commands.last().toArray()[1].toArray();
-            const auto generated = waveCommands(wave, a, b, commands.size() - 3);
+            const auto generated = waveCommands(wave, a, b, commands.size() - 3, shape.value("style").toObject().value("width").toDouble());
             if (!generated.isEmpty()) {
                 commands = generated;
             }
@@ -1915,18 +2150,22 @@ QString paintSvg(const QJsonObject& doc, const std::vector<Part>& parts, const Q
             }
             return style;
         };
-        const QJsonObject style = deformPaint(shape.value("style").toObject());
+        const QJsonObject style = noiseStyle(shape.value("wave").toObject(), deformPaint(shape.value("style").toObject()));
         QString path;
         QStringList pieces;
         auto ranges=shape.value("paintRanges").toArray();
         for (int ri=0; ri < ranges.size(); ++ri) {
             auto range=ranges[ri].toObject();
-            range["style"]=deformPaint(range.value("style").toObject());
+            range["style"]=noiseStyle(shape.value("wave").toObject(), deformPaint(range.value("style").toObject()));
             ranges[ri]=range;
         }
         int commandIndex=0;
         QJsonArray drawn;
-        const auto shapeCommands=shape.value("commands").toArray();
+        auto shapeCommands=shape.value("commands").toArray();
+        if (noiseGuide(shape)) {
+            shapeCommands = noiseCommands(shape.value("wave").toObject(), shapeCommands, style.value("width").toDouble());
+            ranges = {};
+        }
         for (const auto& commandValue : shapeCommands) {
             const auto head=shape.value("resolvedArrowHeads").toObject().value(QString::number(commandIndex++)).toObject();
             const int pathStart=path.size();
@@ -2619,14 +2858,27 @@ static QVariantList anchorsFiltered(Score* score, int subdivision, const std::se
             if (targets && !targets->count({ int(page->pageNumber()), staff })) {
                 continue;
             }
-            if (!system->staff(staff) || !score->staff(staff)->show()) {
+            if (staff >= system->staves().size() || !system->staff(staff)
+                || !measure->visible(staff)) {
                 continue;
             }
             const double y = system->staffCanvasYpage(staff), sp = measure->spatium();
-            const auto row = QStringLiteral("%1:%2:%3").arg(system->page()->pageNumber())
-                             .arg(system->canvasPos().y(), 0, 'g', 12).arg(staff);
+            const auto systemKey = QStringLiteral("%1:%2").arg(page->pageNumber())
+                                   .arg(system->canvasPos().y(), 0, 'g', 12);
+            const auto row = systemKey + QStringLiteral(":%1").arg(staff);
             const auto key = QStringLiteral("%1:%2").arg(staff)
                              .arg(QString::fromStdString(measure->tick().toString().toStdString()));
+            const auto systemBox = system->canvasBoundingRect();
+            auto appendMarker = [&](QVariantMap marker) {
+                marker["system"] = systemKey;
+                marker["systemTop"] = systemBox.top();
+                marker["systemBottom"] = systemBox.bottom();
+                marker["systemLeft"] = systemBox.left();
+                marker["systemRight"] = systemBox.right();
+                marker["measureLeft"] = measure->canvasPos().x();
+                marker["measureRight"] = measure->canvasPos().x() + measure->width();
+                result.append(marker);
+            };
             if (subdivision == 0) {
                 for (Segment* segment=measure->first(SegmentType::ChordRest); segment; segment=segment->next(SegmentType::ChordRest)) {
                     const EngravingItem* symbol=nullptr;
@@ -2646,7 +2898,7 @@ static QVariantList anchorsFiltered(Score* score, int subdivision, const std::se
                     const Fraction time=segment->rtick();
                     const auto box=symbol->canvasBoundingRect();
                     const double bindingX=measure->canvasPos().x() + rhythmicX(measure, time);
-                    result.append(QVariantMap { { "x", box.center().x() }, { "bindingX", bindingX }, { "y", y }, { "railY",
+                    appendMarker(QVariantMap { { "x", box.center().x() }, { "bindingX", bindingX }, { "y", y }, { "railY",
                                                                                                                    box.top() - 0.75 * sp },
                                       { "row", row }, { "staff", int(staff) }, { "key", key }, { "numerator",
                                                                                                  time.numerator() }, { "denominator",
@@ -2658,7 +2910,7 @@ static QVariantList anchorsFiltered(Score* score, int subdivision, const std::se
             }
             for (Fraction t(0, 1); t <= measure->ticks(); t += Fraction(1, subdivision)) {
                 const double x = measure->canvasPos().x() + rhythmicX(measure, t);
-                result.append(QVariantMap { { "x", x }, { "y", y }, { "railY", y - 2.5 * sp },
+                appendMarker(QVariantMap { { "x", x }, { "y", y }, { "railY", y - 2.5 * sp },
                                   { "row", row }, { "staff", int(staff) }, { "key", key },
                                   { "numerator", t.numerator() }, { "denominator", t.denominator() }, { "spatium", sp },
                                   { "page", int(page->pageNumber()) }, { "pageX", pageBox.x() }, { "pageY", pageBox.y() },
@@ -3134,6 +3386,10 @@ void setEditing(Score* score, bool active)
     for (Image* i : nativeImages(score)) {
         i->setHiddenByDrawingEditor(active);
         i->setSelectable(false);
+        if (i->selected()) {
+            score->selection().remove(i);
+            score->setSelectionChanged(true);
+        }
     }
 }
 
@@ -3307,7 +3563,7 @@ static QString nativeDocumentFiltered(Score* score, const QSet<QString>* drawing
             }
         }
         shape["commands"] = commands;
-        if (shape.contains("wave") && commands.size() >= 4) {
+        if (shape.contains("wave") && (commands.size() >= 4 || (noiseGuide(shape) && commands.size() >= 2))) {
             auto wave=shape.value("wave").toObject();
             const auto geometry=doc.value("geometry").toArray();
             if (!geometry.isEmpty()) {
@@ -3322,9 +3578,35 @@ static QString nativeDocumentFiltered(Score* score, const QSet<QString>* drawing
                     wave["stops"]=stops;
                 }
             }
-            const auto a=commands[commands.size() - 2].toArray(), b=commands.last().toArray();
+            auto a=commands[noiseGuide(shape) ? 0 : commands.size() - 2].toArray(), b=commands.last().toArray();
+            if (noiseGuide(shape)) {
+                b = QJsonArray { "M", b[b.size() - 2], b.last() };
+            }
             wave["a"]=QJsonObject{ { "x", a[1] }, { "y", a[2] } };
             wave["b"]=QJsonObject{ { "x", b[1] }, { "y", b[2] } };
+            if (wave.value("waveform").toString() == "noise" && !noiseGuide(shape)) {
+                const int oldCount = commands.size();
+                // Upgrade existing stipples without carrying decorative dot
+                // anchors into the guide's editable topology.
+                commands = QJsonArray { QJsonArray { "M", a[1], a[2] }, QJsonArray { "L", b[1], b[2] } };
+                QJsonArray remapped;
+                for (const auto& value : links) {
+                    auto link = value.toObject();
+                    if (link.value("shape").toInt() == index) {
+                        const int command = link.value("command").toInt();
+                        if (command < oldCount - 2 || command >= oldCount) {
+                            continue;
+                        }
+                        link["command"] = command - (oldCount - 2);
+                    }
+                    remapped.append(link);
+                }
+                links = remapped;
+                wave["guideVersion"] = 1;
+                shape["commands"] = commands;
+                shape.remove("paintRanges");
+                shape.remove("segmentStyles");
+            }
             shape["wave"]=wave;
         }
         shape=localShapeLinks(score, shape, image->staffIdx());
@@ -4338,6 +4620,14 @@ bool layout(const Image* image, Image::LayoutData* data)
         || !image->explicitParent() || !image->explicitParent()->isSegment()) {
         return false;
     }
+    const auto measure = toSegment(image->explicitParent())->measure();
+    if (!measure || !measure->system() || !measure->system()->page()
+        || !measure->system()->staff(image->staffIdx())) {
+        // Systems are collected before they are attached to pages. Canvas
+        // coordinates are not available yet; use ordinary image bounds until
+        // ScoreRenderer's final drawing pass runs after pagination.
+        return false;
+    }
     const QJsonObject doc = metadata(image);
     if (doc.value("nativeOwner").toString() == "MuseDrawNative") {
         const_cast<Image*>(image)->setOffset(PointF(0, 0));
@@ -4403,7 +4693,7 @@ bool layout(const Image* image, Image::LayoutData* data)
         const auto anchor=doc.value("rigidAnchor").toObject();
         if (!anchor.isEmpty()) {
             if (const auto m=referencedMeasure(image->score(), anchor)) {
-                if (m->system()) {
+                if (m->system() && m->system()->page()) {
                     x+=m->canvasPos().x() + rhythmicX(m, fraction(anchor, "time")) - parentSegment->canvasPos().x();
                 }
             }
@@ -4449,7 +4739,7 @@ bool layout(const Image* image, Image::LayoutData* data)
             const auto staff=localStaff(image->score(), link, image->staffIdx());
             const Fraction time(link.value("numerator").toInt(), link.value("denominator").toInt());
             if (const auto m=referencedMeasure(image->score(), link)) {
-                if (m->system() && m->system()->staff(staff)) {
+                if (m->system() && m->system()->page() && m->system()->staff(staff)) {
                     target=QPointF(m->canvasPos().x() + rhythmicX(m, time) + link.value("markerOffsetX").toDouble(),
                                    m->system()->staffCanvasYpage(staff));
                     attached=true;

@@ -198,6 +198,10 @@ Item {
                     label: qsTrc("drawing-tools", "Wave")
                 },
                 {
+                    key: "noise",
+                    label: qsTrc("drawing-tools", "Stipple / noise")
+                },
+                {
                     key: "polygon",
                     label: qsTrc("drawing-tools", "Polygon")
                 },

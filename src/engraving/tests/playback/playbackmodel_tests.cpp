@@ -960,6 +960,80 @@ TEST_F(Engraving_PlaybackModelTests, SimpleRepeat_Changes_Notification)
     EXPECT_EQ(receivedEventCount, expectedEventCount);
 }
 
+TEST_F(Engraving_PlaybackModelTests, ImageChangesDoNotResendMusicalEvents)
+{
+    std::unique_ptr<MasterScore> score(ScoreRW::readScore(PLAYBACK_MODEL_TEST_FILES_DIR + "repeat_range/repeat_range.mscx"));
+    ASSERT_TRUE(score);
+    ASSERT_EQ(score->parts().size(), 1);
+    const Part* part = score->parts().front();
+
+    ON_CALL(*m_repositoryMock, defaultProfile(_)).WillByDefault(Return(m_defaultProfile));
+    PlaybackModel model(modularity::globalCtx());
+    model.profilesRepository.set(m_repositoryMock);
+    model.load(score.get());
+    const InstrumentTrackId trackId { part->id(), part->instrumentId() };
+    PlaybackData data = model.resolveTrackPlaybackData(trackId);
+    ASSERT_FALSE(data.originEvents.empty());
+
+    size_t streamUpdates = 0;
+    size_t trackUpdates = 0;
+    data.mainStream.onReceive(this, [&streamUpdates](const PlaybackEventsMap&, const DynamicLevelLayers&) {
+        ++streamUpdates;
+    });
+    model.tracksDataChanged().onReceive(this, [&trackUpdates](const InstrumentTrackIdSet&) {
+        ++trackUpdates;
+    });
+    model.setSendEventsOnScoreChange(trackId, true);
+
+    ScoreChanges changes;
+    changes.tickFrom = 480;
+    changes.tickTo = 3840;
+    changes.staffIdxFrom = 0;
+    changes.staffIdxTo = 0;
+    changes.changedTypes = { ElementType::IMAGE };
+    score->changesChannel().send(changes);
+    EXPECT_EQ(streamUpdates, 0);
+    EXPECT_EQ(trackUpdates, 0);
+
+    // Image-only changes with invalid boundaries used to reload the score.
+    changes.tickFrom = -1;
+    changes.tickTo = -1;
+    score->changesChannel().send(changes);
+    EXPECT_EQ(streamUpdates, 0);
+    EXPECT_EQ(trackUpdates, 0);
+
+    // A pending drawing edit must not queue a later musical resend either.
+    model.setSendEventsOnScoreChange(trackId, false);
+    score->changesChannel().send(changes);
+    model.sendEventsForChangedTracks();
+    model.setSendEventsOnScoreChange(trackId, true);
+    EXPECT_EQ(streamUpdates, 0);
+    EXPECT_EQ(trackUpdates, 0);
+
+    changes.tickFrom = 480;
+    changes.tickTo = 3840;
+    changes.changedTypes = { ElementType::IMAGE, ElementType::NOTE };
+    score->changesChannel().send(changes);
+    EXPECT_GT(streamUpdates, 0);
+    EXPECT_GT(trackUpdates, 0);
+
+    streamUpdates = 0;
+    trackUpdates = 0;
+    changes.changedTypes = { ElementType::IMAGE };
+    changes.changedPropertyIdSet = { Pid::REPEAT_COUNT };
+    score->changesChannel().send(changes);
+    EXPECT_GT(streamUpdates, 0);
+    EXPECT_GT(trackUpdates, 0);
+
+    streamUpdates = 0;
+    trackUpdates = 0;
+    changes.changedPropertyIdSet.clear();
+    changes.changedStyleIdSet = { Sid::swingUnit };
+    score->changesChannel().send(changes);
+    EXPECT_GT(streamUpdates, 0);
+    EXPECT_GT(trackUpdates, 0);
+}
+
 /**
  * @brief PlaybackModelTests_TempoChangesDuringNotes
  * @details Test that notes and other elements have the correct length when tempo changes occur during them

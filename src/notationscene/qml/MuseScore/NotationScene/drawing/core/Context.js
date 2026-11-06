@@ -151,7 +151,7 @@ function curvature(editor,hit,smooth){
   else if(!smooth){c[3]=c[5];c[4]=c[6];}
  }else if(smooth&&c&&c[0]==="L"&&prev){var px=prev[prev.length-2],py=prev[prev.length-1];s.commands[i]=["C",px+(c[1]-px)/3,py+(c[2]-py)/3,px+2*(c[1]-px)/3,py+2*(c[2]-py)/3,c[1],c[2]];}
  if(!smooth&&next&&next[0]==="C"){next[1]=c[c.length-2];next[2]=c[c.length-1];}
- delete s.wave;delete s.reflowSource;delete s.reflowGroup;all[hit.shape]=s;editor.shapes=all;editor.autoLink(hit.shape);editor.changed();
+ if(!V.isNoiseGuide(s))delete s.wave;delete s.reflowSource;delete s.reflowGroup;all[hit.shape]=s;editor.shapes=all;editor.autoLink(hit.shape);editor.changed();
 }
 
 function nextName(shapes,name){
