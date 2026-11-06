@@ -1,0 +1,37 @@
+{
+  "master": "share/icons/AppIcon/MS4_Drawing_AppIcon.png",
+  "masterSha256": "f71229f7dfd01846c71d8ac838b2e0ad2624eba49a1c881602cd9eb5b15b74ad",
+  "masterSize": [
+    2000,
+    2000
+  ],
+  "icoFrames": [
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256
+  ],
+  "assets": {
+    "share/icons/AppIcon/MS4_AppIcon_16x16.png": "cb07a663e1cefa8f02be37d5c8afa8e3084e1d8283ff2441ebe82efd59739355",
+    "share/icons/AppIcon/MS4_AppIcon_24x24.png": "95dd1efecd106c28a9d181579470528e120ce8f1c13fec04b0c8f1b175651cac",
+    "share/icons/AppIcon/MS4_AppIcon_32x32.png": "2160c03aff15429e9fbc75781ceb39097dc92a743b17918877987a70aadd1d67",
+    "share/icons/AppIcon/MS4_AppIcon_48x48.png": "da705740586fc44c0c1532e0348f678cfbcdf78b3af80cf0c9b92b0a2a428f2e",
+    "share/icons/AppIcon/MS4_AppIcon_64x64.png": "f5e67490f47ff3e049aba21ce52a71fc9949bb966f85f276ce4ed5ba9a554475",
+    "share/icons/AppIcon/MS4_AppIcon_96x96.png": "cc52f1b072967b4386d1ba87617fe9611f6533abbec6b32eae5ae668d140daf7",
+    "share/icons/AppIcon/MS4_AppIcon_128x128.png": "d588004197fd4e7cf256ba49067fedff226491ced22e6d6a11bc4f91baae6ee2",
+    "share/icons/AppIcon/MS4_AppIcon_256x256.png": "acffdd403c072b885798b6a4d48fd11de367601d992b0ff46e97368250594550",
+    "share/icons/AppIcon/MS4_AppIcon_512x512.png": "fee4ce3cc1397413b3161ad647be08709b83bc9e3274c622b3d1a604fe09e9f8",
+    "share/icons/AppIcon/MS4_AppIcon_1024x1024.png": "867d59311d4cf10d645f99d90174f5d032aa2200c6506411024a03b278cdbf82",
+    "share/icons/AppIcon/MS4_AppIcon_2048x2048.png": "cc662764fd3acb6c26bfd220c71faa834ebe33c59d560973f2a742acfdcd33e4",
+    "share/icons/AppIcon/MS4_AppIcon.ico": "820620797d840332436a2c823a845608a2e72fb4f952f37f3577ab9f4f7e025a",
+    "share/icons/AppIcon/MS4_AppIcon.icns": "e9f0508f9032af0ea21ff331dd9bb95a9d21abd3e100b324651e62e35de90a66",
+    "share/icons/AppIcon/AppIcon.icon/icon.json": "cb46dd0d8cdaafe52de8b4417d1885f64a42d284ce68efd9c36de7cd257b690e",
+    "share/icons/AppIcon/AppIcon.icon/Assets/Drawing.png": "867d59311d4cf10d645f99d90174f5d032aa2200c6506411024a03b278cdbf82",
+    "buildscripts/packaging/Windows/PortableApps/Other/Help/images/favicon.ico": "820620797d840332436a2c823a845608a2e72fb4f952f37f3577ab9f4f7e025a"
+  }
+}
