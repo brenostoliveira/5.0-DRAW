@@ -115,7 +115,6 @@ def main():
     element(product, "MediaTemplate", EmbedCab="yes", CompressionLevel="high")
     element(product, "MajorUpgrade", AllowSameVersionUpgrades="yes", Schedule="afterInstallInitialize",
             DowngradeErrorMessage="A newer MuseScore Drawing edition is installed.")
-    element(product, "Property", Id="ARPNOMODIFY", Value="1")
     element(product, "Property", Id="ARPURLINFOABOUT", Value=spec["repositoryUrl"])
     element(product, "Icon", Id="DrawingIcon", SourceFile=str(source / "share/icons/AppIcon/MS4_AppIcon.ico"))
     element(product, "Property", Id="ARPPRODUCTICON", Value="DrawingIcon")
